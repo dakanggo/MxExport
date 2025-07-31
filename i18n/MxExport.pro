@@ -1,13 +1,7 @@
-# MxExport.pro
-# QGIS插件翻译项目文件 - 增强版
-# 自动生成时间: 1753871351.8222885
-# 支持UI文件翻译提取
- 
 # 项目信息
 TARGET = MxExport
-VERSION = 1.0.0
+VERSION = 2.0
  
-# Qt模块 - 确保pylupdate5正确识别所有控件
 QT += core gui widgets
  
 # Python源文件 - 包含tr()调用的文件
@@ -25,8 +19,9 @@ RESOURCES = ../resources.qrc
  
 # 翻译目标文件 - 支持的语言
 TRANSLATIONS = MxExport_zh_CN.ts \
-               MxExport_en_US.ts
- 
+               MxExport_zh_TW.ts \
+               MxExport_ja.ts
+
 # 编码设置 - 确保正确处理中文字符
 CODECFORTR = UTF-8
 CODECFORSRC = UTF-8
@@ -36,7 +31,7 @@ INCLUDEPATH += ..
  
 # 插件特定定义
 DEFINES += PLUGIN_NAME=\"MxExport\"
-DEFINES += PLUGIN_VERSION=\"1.0.0\"
+DEFINES += PLUGIN_VERSION=\"2.0\"
  
 # pylupdate5 选项
 # 以下注释是给pylupdate5的指令
