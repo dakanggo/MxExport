@@ -9,16 +9,15 @@
 import os
 from qgis.PyQt import QtGui, QtWidgets, uic
 from qgis.PyQt.QtCore import (pyqtSignal, QSettings, Qt, QTimer,
-                              QCoreApplication, QEvent)
+                              QCoreApplication, QEvent, QVariant, QSettings, QTranslator)
 from qgis.PyQt.QtWidgets import QMessageBox, QApplication
-from qgis.PyQt.QtGui import QClipboard
+from qgis.PyQt.QtGui import QClipboard, QColor, QFont
 from qgis.core import (QgsVectorLayer, QgsProject, QgsCoordinateReferenceSystem,
                        QgsFeature, QgsGeometry, QgsWkbTypes, QgsPointXY, QgsRectangle,
                        QgsCoordinateTransform, QgsTextFormat, QgsTextBufferSettings,
                        QgsField, QgsSingleSymbolRenderer, QgsMarkerSymbol, QgsMessageLog,
                        QgsPalLayerSettings, QgsVectorLayerSimpleLabeling)
-from PyQt5.QtCore import QVariant, QSettings, QTranslator
-from PyQt5.QtGui import QColor, QFont
+
 from qgis.utils import iface
 from qgis.gui import QgsMapCanvas
 import json
