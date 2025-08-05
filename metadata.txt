@@ -1,0 +1,21 @@
+[general]
+name=MxExport
+qgisMinimumVersion=3.0
+description=MxExport is a QGIS data export plugin supporting coordinate conversion, WKT/GeoJSON import, XYZ tile display, and layer management. It enables quick area location and GeoJSON export with a clean, user-friendly interface.<br/>MxExport是QGIS专用数据导出插件，支持多坐标系转换、WKT/GeoJSON导入、XYZ瓦片展示和图层管理，可快速定位区域并导出GeoJSON格式数据，界面简洁操作便捷。
+version=2.0
+author=DaKang
+email=dakanggo@gmail.com
+
+about=MxExport is an efficient data export plugin designed specifically for QGIS. It supports multiple coordinate system conversions, including mainstream formats like WGS84. Users can quickly locate target areas through coordinate input, WKT/GeoJSON data import, and other methods. The plugin provides flexible tile map display functionality with support for XYZ tile services and multi-level zoom display. It also features powerful layer management capabilities, supporting layer creation, attribute editing, and data export to standard GeoJSON format. With its clean interface and convenient operation, it's an ideal tool for GIS data processing and map creation.<br/> MxExport是一款专为QGIS设计的高效数据导出插件。该插件支持多种坐标系统转换，包括经纬度(WGS84)等主流坐标格式。用户可以通过坐标输入、WKT/GeoJSON数据导入等方式快速定位目标区域。插件提供灵活的瓦片地图展示功能，支持XYZ瓦片服务和多级别缩放显示。同时具备强大的图层管理能力，支持创建图层、编辑图层属性，并可将数据导出为标准的GeoJSON格式。界面简洁直观，操作便捷，是GIS数据处理和地图制作的理想工具。
+
+tracker=https://github.com/dakanggo/MxExport
+repository=https://github.com/dakanggo/MxExport
+
+tags=wkt,geojson,export,import,layer,coordinate,tiles,map,plugin
+
+homepage=https://github.com/dakanggo/MxExport
+category=Plugins
+icon=dakang_icon.png
+
+experimental=False
+deprecated=False

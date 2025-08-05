@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>MapExportDockWidget</class>
+    <widget class="QDockWidget" name="MapExportDockWidget">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>400</width>
+                <height>500</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>MxExport</string>
+        </property>
+        <widget class="QWidget" name="dockWidgetContents">
+            <layout class="QVBoxLayout" name="verticalLayout">
+                <item>
+                    <widget class="QTabWidget" name="tabWidget">
+                        <property name="currentIndex">
+                            <number>0</number>
+                        </property>
+
+                        <!-- 坐标标签页 -->
+                        <widget class="QWidget" name="coord_tab">
+                            <attribute name="title">
+                                <string>Coordinate</string>  <!-- 修改：统一使用英文作为源文本 -->
+                            </attribute>
+                            <layout class="QVBoxLayout" name="coord_layout">
+                                <item>
+                                    <widget class="QGroupBox" name="coord_input_group">
+                                        <property name="title">
+                                            <string>Coordinate Input</string>  <!-- 修改：英文源文本 -->
+                                        </property>
+                                        <layout class="QVBoxLayout" name="coord_input_layout">
+                                            <item>
+                                                <layout class="QHBoxLayout" name="coord_type_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="coord_type_label">
+                                                            <property name="text">
+                                                                <string>Coordinate Format:</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QComboBox" name="coord_type_combo">
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string>Longitude/Latitude (WGS84)</string>  <!-- 修改 -->
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string>Web Mercator (EPSG:3857)</string>  <!-- 修改 -->
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string>UTM Coordinates</string>  <!-- 修改 -->
+                                                                </property>
+                                                            </item>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                            <item>
+                                                <layout class="QHBoxLayout" name="coord_input_layout_h">
+                                                    <item>
+                                                        <widget class="QLabel" name="x_y_label">
+                                                            <property name="text">
+                                                                <string>X,Y/Longitude,Latitude:</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QLineEdit" name="x_y_coord_edit">
+                                                            <property name="placeholderText">
+                                                                <string notr="true">116.39739,39.90931</string>  <!-- 示例坐标不翻译 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                            <item>
+                                                <layout class="QHBoxLayout" name="coord_buttons_layout">
+                                                    <item>
+                                                        <widget class="QPushButton" name="goto_coord_btn">
+                                                            <property name="text">
+                                                                <string>Go to Coordinate</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QPushButton" name="set_point_btn">
+                                                            <property name="text">
+                                                                <string>Set Marker Point</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QPushButton" name="show_crosshair_btn">
+                                                            <property name="text">
+                                                                <string>Hide Crosshair</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                        </layout>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QGroupBox" name="tile_group">
+                                        <property name="title">
+                                            <string>Tile Boundary Display</string>  <!-- 修改 -->
+                                        </property>
+                                        <layout class="QVBoxLayout" name="tile_layout">
+                                            <item>
+                                                <layout class="QHBoxLayout" name="tile_type_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="tile_type_label">
+                                                            <property name="text">
+                                                                <string>Tile Type:</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QComboBox" name="tile_type_combo">
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">NDS</string>  <!-- 技术名词不翻译 -->
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">XYZ</string>  <!-- 技术名词不翻译 -->
+                                                                </property>
+                                                            </item>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QLabel" name="level_label">
+                                                            <property name="text">
+                                                                <string>Level:</string>
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QComboBox" name="level_combo">
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">1</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">2</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">3</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">4</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">5</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">6</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">7</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">8</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">9</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">10</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">11</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">12</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">13</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">14</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">15</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">16</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">17</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">18</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">19</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">20</string>
+                                                                </property>
+                                                            </item>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                            <item>
+                                                <widget class="QPushButton" name="show_tile_boundary_btn">
+                                                    <property name="text">
+                                                        <string>Show Tile Boundary</string>  <!-- 修改 -->
+                                                    </property>
+                                                </widget>
+                                            </item>
+                                        </layout>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QGroupBox" name="current_coord_group">
+                                        <property name="title">
+                                            <string>Screen Center Position</string>  <!-- 修改 -->
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">
+                                                QGroupBox {
+                                                font-weight: bold;
+                                                font-size: 12px;
+                                                border: 2px solid #3498db;
+                                                border-radius: 8px;
+                                                margin-top: 10px;
+                                                padding-top: 10px;
+                                                }
+                                                QGroupBox::title {
+                                                subcontrol-origin: margin;
+                                                left: 10px;
+                                                padding: 0 8px 0 8px;
+                                                color: #2c3e50;
+                                                background-color: white;
+                                                border-radius: 4px;
+                                                }
+                                            </string>
+                                        </property>
+                                        <layout class="QVBoxLayout" name="current_coord_layout">
+                                            <property name="spacing">
+                                                <number>12</number>
+                                            </property>
+                                            <property name="leftMargin">
+                                                <number>15</number>
+                                            </property>
+                                            <property name="topMargin">
+                                                <number>15</number>
+                                            </property>
+                                            <property name="rightMargin">
+                                                <number>15</number>
+                                            </property>
+                                            <property name="bottomMargin">
+                                                <number>15</number>
+                                            </property>
+
+                                            <item>
+                                                <layout class="QHBoxLayout" name="current_coord_row_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="current_coord_label">
+                                                            <property name="text">
+                                                                <string>Screen Center Position:</string>  <!-- 修改 -->
+                                                            </property>
+                                                            <property name="wordWrap">
+                                                                <bool>true</bool>
+                                                            </property>
+                                                            <property name="styleSheet">
+                                                                <string notr="true">
+                                                                    QLabel {
+                                                                    font-size: 11px;
+                                                                    font-weight: 500;
+                                                                    color: #2c3e50;
+                                                                    padding: 5px;
+                                                                    background-color: rgba(52, 152, 219, 0.1);
+                                                                    border-radius: 2px;
+                                                                    border-left: 3px solid #3498db;
+                                                                    }
+                                                                </string>
+                                                            </property>
+                                                            <property name="alignment">
+                                                                <set>Qt::AlignVCenter</set>
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QPushButton" name="current_coord_copy_btn">
+                                                            <property name="text">
+                                                                <string>Copy</string>  <!-- 修改 -->
+                                                            </property>
+                                                            <property name="maximumSize">
+                                                                <size>
+                                                                    <width>70</width>
+                                                                    <height>30</height>
+                                                                </size>
+                                                            </property>
+                                                            <property name="minimumSize">
+                                                                <size>
+                                                                    <width>70</width>
+                                                                    <height>30</height>
+                                                                </size>
+                                                            </property>
+                                                            <property name="toolTip">
+                                                                <string>Copy screen center position to clipboard</string>  <!-- 修改 -->
+                                                            </property>
+                                                            <property name="styleSheet">
+                                                                <string notr="true">
+                                                                    QPushButton {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #3498db, stop:1 #2980b9);
+                                                                    border: none;
+                                                                    border-radius: 6px;
+                                                                    color: white;
+                                                                    font-weight: bold;
+                                                                    font-size: 10px;
+                                                                    padding: 2px;
+                                                                    }
+                                                                    QPushButton:hover {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #5dade2, stop:1 #3498db);
+                                                                    transform: translateY(-1px);
+                                                                    }
+                                                                    QPushButton:pressed {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #2980b9, stop:1 #1f4e79);
+                                                                    }
+                                                                </string>
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+
+                                            <item>
+                                                <layout class="QHBoxLayout" name="nds_tile_id_row_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="nds_tile_id_label">
+                                                            <property name="text">
+                                                                <string>🗂️ NDS Level 13 TileID:</string>  <!-- 修改 -->
+                                                            </property>
+                                                            <property name="wordWrap">
+                                                                <bool>true</bool>
+                                                            </property>
+                                                            <property name="styleSheet">
+                                                                <string notr="true">
+                                                                    QLabel {
+                                                                    font-size: 11px;
+                                                                    font-weight: 500;
+                                                                    color: #2c3e50;
+                                                                    padding: 5px;
+                                                                    background-color: rgba(155, 89, 182, 0.1);
+                                                                    border-radius: 2px;
+                                                                    border-left: 3px solid #9b59b6;
+                                                                    }
+                                                                </string>
+                                                            </property>
+                                                            <property name="alignment">
+                                                                <set>Qt::AlignVCenter</set>
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QPushButton" name="nds_tile_id_copy_btn">
+                                                            <property name="text">
+                                                                <string>Copy</string>
+                                                            </property>
+                                                            <property name="maximumSize">
+                                                                <size>
+                                                                    <width>70</width>
+                                                                    <height>30</height>
+                                                                </size>
+                                                            </property>
+                                                            <property name="minimumSize">
+                                                                <size>
+                                                                    <width>70</width>
+                                                                    <height>30</height>
+                                                                </size>
+                                                            </property>
+                                                            <property name="toolTip">
+                                                                <string>Copy to clipboard</string>  <!-- 修改 -->
+                                                            </property>
+                                                            <property name="styleSheet">
+                                                                <string notr="true">
+                                                                    QPushButton {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #9b59b6, stop:1 #8e44ad);
+                                                                    border: none;
+                                                                    border-radius: 6px;
+                                                                    color: white;
+                                                                    font-weight: bold;
+                                                                    font-size: 10px;
+                                                                    padding: 2px;
+                                                                    }
+                                                                    QPushButton:hover {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #bb77c4, stop:1 #9b59b6);
+                                                                    transform: translateY(-1px);
+                                                                    }
+                                                                    QPushButton:pressed {
+                                                                    background-color: qlineargradient(x1:0, y1:0, x2:0,
+                                                                    y2:1, stop:0 #8e44ad, stop:1 #6c3483);
+                                                                    }
+                                                                </string>
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                        </layout>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+
+                        <!-- WKT/GeoJSON 标签页 -->
+                        <widget class="QWidget" name="wkt_tab">
+                            <attribute name="title">
+                                <string notr="true">WKT/GeoJSON</string>  <!-- 技术术语不翻译 -->
+                            </attribute>
+                            <layout class="QVBoxLayout" name="wkt_layout">
+                                <item>
+                                    <widget class="QGroupBox" name="data_group">
+                                        <property name="title">
+                                            <string>Data Input</string>  <!-- 修改 -->
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">QGroupBox { font-weight: bold; }</string>
+                                        </property>
+                                        <layout class="QVBoxLayout" name="data_layout">
+                                            <item>
+                                                <layout class="QHBoxLayout" name="template_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="template_label">
+                                                            <property name="text">
+                                                                <string>Template:</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QComboBox" name="template_combo">
+                                                            <!-- 模板选项将在代码中动态添加和翻译 -->
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                            <item>
+                                                <widget class="QLabel" name="hint_label">
+                                                    <property name="text">
+                                                        <string>Please enter WKT or GeoJSON data, or select a template from above</string>  <!-- 修改 -->
+                                                    </property>
+                                                    <property name="styleSheet">
+                                                        <string notr="true">QLabel { color: #666; font-size: 11px; }</string>
+                                                    </property>
+                                                </widget>
+                                            </item>
+                                            <item>
+                                                <widget class="QTextEdit" name="wkt_text_edit">
+                                                    <property name="placeholderText">
+                                                        <string>Enter WKT or GeoJSON data here...</string>  <!-- 修改 -->
+                                                    </property>
+                                                    <!-- 其他属性保持不变 -->
+                                                </widget>
+                                            </item>
+                                        </layout>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <widget class="QGroupBox" name="layer_group">
+                                        <property name="title">
+                                            <string>Layer Settings</string>  <!-- 修改 -->
+                                        </property>
+                                        <layout class="QVBoxLayout" name="layer_settings_layout">
+                                            <item>
+                                                <layout class="QHBoxLayout" name="layer_name_layout">
+                                                    <item>
+                                                        <widget class="QLabel" name="layer_label">
+                                                            <property name="text">
+                                                                <string>Layer Name:</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QLineEdit" name="layer_name_edit">
+                                                            <property name="placeholderText">
+                                                                <string>Enter layer name (default: mx)</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                            <item>
+                                                <layout class="QHBoxLayout" name="options_layout">
+                                                    <item>
+                                                        <widget class="QCheckBox" name="create_layer_checkbox">
+                                                            <property name="text">
+                                                                <string>Create Layer</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                    <item>
+                                                        <widget class="QCheckBox" name="zoom_layer_checkbox">
+                                                            <property name="text">
+                                                                <string>Zoom to Layer</string>  <!-- 修改 -->
+                                                            </property>
+                                                        </widget>
+                                                    </item>
+                                                </layout>
+                                            </item>
+                                        </layout>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <layout class="QHBoxLayout" name="button_layout">
+                                        <item>
+                                            <widget class="QPushButton" name="clear_btn">
+                                                <property name="text">
+                                                    <string>Clear</string>  <!-- 修改 -->
+                                                </property>
+                                                <!-- 样式保持不变 -->
+                                            </widget>
+                                        </item>
+                                        <item>
+                                            <widget class="QPushButton" name="confirm_btn">
+                                                <property name="text">
+                                                    <string>Confirm</string>  <!-- 修改 -->
+                                                </property>
+                                                <!-- 样式保持不变 -->
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </item>
+                            </layout>
+                        </widget>
+
+                        <!-- 关于标签页 -->
+                        <widget class="QWidget" name="about_tab">
+                            <attribute name="title">
+                                <string>About</string>  <!-- 修改 -->
+                            </attribute>
+                            <layout class="QVBoxLayout" name="about_layout">
+                                <!-- 保持原有布局，但修改文本内容 -->
+                                <item>
+                                    <widget class="QLabel" name="title_label">
+                                        <property name="text">
+                                            <string notr="true">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot;
+                                                font-size:48pt; font-weight:300; color:#2c3e50; letter-spacing:2px;&quot;&gt;MxExport&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;
+                                            </string>
+                                        </property>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <widget class="QLabel" name="subtitle_label">
+                                        <property name="text">
+                                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot;
+                                                font-size:20pt; font-weight:400; color:#7f8c8d; margin-top:10px;&quot;&gt;MxExport V2 - Geographic Data Export Tool&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;
+                                            </string>
+                                        </property>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <widget class="QLabel" name="description_label">
+                                        <property name="text">
+                                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot;
+                                                font-size:14pt; color:#34495e; line-height:1.8; font-weight:300;&quot;&gt;
+                                                Efficient GeoJSON and WKT format import tool&lt;br/&gt;
+                                                Rich coordinate display and conversion functions&lt;br/&gt;
+                                                Support for tile boundary display of various map services&lt;br/&gt;
+                                                Suitable for map application development&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;
+                                            </string>
+                                        </property>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <widget class="QLabel" name="author_label">
+                                        <property name="text">
+                                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot;
+                                                font-size:14pt; color:#7f8c8d; font-weight:400;&quot;&gt;Developer: DAKANG&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;
+                                            </string>
+                                        </property>
+                                    </widget>
+                                </item>
+
+                                <item>
+                                    <widget class="QLabel" name="email_label">
+                                        <property name="text">
+                                            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot;
+                                                font-size:13pt; color:#95a5a6;&quot;&gt;Contact Email: &lt;/span&gt;&lt;a
+                                                href=&quot;mailto:yujikang@mxnavi.com&quot;&gt;&lt;span
+                                                style=&quot;color:#3498db; text-decoration:none; font-weight:400;&quot;&gt;yujikang@mxnavi.com&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;
+                                            </string>
+                                        </property>
+                                    </widget>
+                                </item>
+
+                            </layout>
+                        </widget>
+                    </widget>
+                </item>
+            </layout>
+        </widget>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

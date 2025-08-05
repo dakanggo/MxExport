@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/plugins/MxExportV2" >
+    <file>dakang_icon.png</file>
+  </qresource>
+</RCC>
