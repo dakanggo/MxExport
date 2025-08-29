@@ -10,7 +10,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QPainter, QPen, QColor, QBrush
 from qgis.PyQt.QtWidgets import QWidget, QMessageBox
 from qgis.gui import QgsMapCanvas
-from qgis.core import QgsGeometry, QgsPointXY, QgsCoordinateReferenceSystem
+from qgis.core import QgsGeometry, QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
 from qgis.utils import iface
 
 
@@ -30,29 +30,34 @@ class CrosshairOverlay(QWidget):
 
         self.show()
 
-    def get_center_point(self):
+    def get_center_point(self, target_crs_code='EPSG:4326'):
+        """获取中心点坐标，支持不同的目标坐标系
+        
+        Args:
+            target_crs_code: 目标坐标系代码，如 'EPSG:4326' 或 'EPSG:3857'
+        """
         canvas = iface.mapCanvas()
         center_point = canvas.center()
 
         canvas_crs = canvas.mapSettings().destinationCrs()
-        wgs84_crs = QgsCoordinateReferenceSystem('EPSG:4326')
+        target_crs = QgsCoordinateReferenceSystem(target_crs_code)
 
-        if canvas_crs != wgs84_crs:
-            transform = QgsCoordinateTransform(canvas_crs, wgs84_crs, QgsProject.instance())
-            wgs84_point = transform.transform(center_point)
+        if canvas_crs != target_crs:
+            transform = QgsCoordinateTransform(canvas_crs, target_crs, QgsProject.instance())
+            transformed_point = transform.transform(center_point)
         else:
-            wgs84_point = center_point
-        return wgs84_point
+            transformed_point = center_point
+        return transformed_point
 
     def paintEvent(self, event):
         """绘制十字准线和tile边界"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        coord = self.get_center_point()
-
-        # 获取画布中心
-        map_point = QgsPointXY(coord[0], coord[1])
-        canvas_point = self.canvas.getCoordinateTransform().transform(map_point)
+        
+        # 获取画布坐标系的中心点，用于绘制
+        canvas = iface.mapCanvas()
+        center_point = canvas.center()
+        canvas_point = self.canvas.getCoordinateTransform().transform(center_point)
         center_x, center_y = int(canvas_point.x()), int(canvas_point.y())
         # 绘制十字准线（改为细长十字）
         if self.show_crosshair:
@@ -91,7 +96,7 @@ class CrosshairOverlay(QWidget):
         """绘制tile边界"""
         try:
             # 设置画笔
-            pen = QPen(QColor(0, 0, 204), 1, Qt.SolidLine)
+            pen = QPen(QColor(0, 0, 204), 2, Qt.SolidLine)  # 增加线宽使边界更明显
             painter.setPen(pen)
             painter.setBrush(Qt.NoBrush)
 
@@ -102,9 +107,17 @@ class CrosshairOverlay(QWidget):
 
                 # 转换坐标到屏幕坐标
                 screen_points = []
+                
+                # 获取canvas的坐标系信息
+                canvas = iface.mapCanvas()
+                canvas_crs = canvas.mapSettings().destinationCrs()
+                
                 for coord in coords:
-                    # 将WGS84坐标转换为屏幕坐标
+                    # tile边界坐标已经是canvas坐标系下的坐标
+                    # 直接创建QgsPointXY并转换为屏幕坐标
                     map_point = QgsPointXY(coord[0], coord[1])
+                    
+                    # 使用canvas的坐标转换将地图坐标转换为屏幕坐标
                     canvas_point = self.canvas.getCoordinateTransform().transform(map_point)
                     screen_points.append((int(canvas_point.x()), int(canvas_point.y())))
 
@@ -118,6 +131,13 @@ class CrosshairOverlay(QWidget):
 
         except Exception as e:
             print(f"绘制tile边界时出错: {e}")
+            # 输出更多调试信息
+            canvas = iface.mapCanvas()
+            canvas_crs = canvas.mapSettings().destinationCrs()
+            print(f"Canvas CRS: {canvas_crs.authid()}")
+            if self.tile_polygon:
+                print(f"Tile polygon bounds: {self.tile_polygon.bounds}")
+                print(f"Tile polygon coords: {list(self.tile_polygon.exterior.coords)[:5]}...")  # 只打印前5个点
 
     def toggle_crosshair(self):
         """切换十字准线显示状态"""

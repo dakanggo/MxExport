@@ -6,6 +6,7 @@
 # @Created   : 2025/7/28 11:47
 # @Desc      : Map Export DockWidget with i18n support
 
+from hmac import new
 import os
 from qgis.PyQt import QtGui, QtWidgets, uic
 from qgis.PyQt.QtCore import (pyqtSignal, QSettings, Qt, QTimer,
@@ -297,6 +298,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.show_crosshair_btn.clicked.connect(self.toggle_crosshair_display)
         self.x_y_coord_edit.returnPressed.connect(self.goto_coordinate)
         self.set_point_btn.clicked.connect(self.set_point_layer)
+        self.coord_type_combo.currentTextChanged.connect(self.on_coord_type_changed)
 
         # tile边界相关信号
         self.show_tile_boundary_btn.clicked.connect(self.toggle_tile_boundary)
@@ -324,6 +326,10 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.update_tile_boundary()
         self.update_center_info()
 
+    def on_coord_type_changed(self):
+        """坐标系类型改变时更新显示"""
+        self.update_center_info()
+
     def on_tile_type_settings_changed(self):
         """tile类型设置改变时更新显示"""
         if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
@@ -340,18 +346,31 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def update_center_info(self):
         """更新屏幕中心位置信息"""
         try:
-            # 获取屏幕中心坐标
-            wgs84_point = self.get_center_point()
+            # 获取屏幕中心坐标（根据UI选择的坐标系）
+            center_point = self.get_center_point()
+            
+            # 确定坐标系类型
+            coord_type = self.coord_type_combo.currentText()
+            is_mercator = "3857" in coord_type
 
             # 更新坐标输入框
-            self.x_y_coord_edit.setText(f"{wgs84_point.x():.6f}, {wgs84_point.y():.6f}")
-
-            # 更新坐标显示标签
-            coord_text = self.tr("Longitude, Latitude: {0:.6f}, {1:.6f}").format(
-                wgs84_point.x(), wgs84_point.y())
+            if is_mercator:
+                # 3857坐标系使用较少的小数位数
+                self.x_y_coord_edit.setText(f"{center_point.x():.2f}, {center_point.y():.2f}")
+                # 更新坐标显示标签
+                coord_text = self.tr("X, Y (EPSG:3857): {0:.2f}, {1:.2f}").format(
+                    center_point.x(), center_point.y())
+            else:
+                # WGS84坐标系使用更多小数位数
+                self.x_y_coord_edit.setText(f"{center_point.x():.6f}, {center_point.y():.6f}")
+                # 更新坐标显示标签
+                coord_text = self.tr("Longitude, Latitude: {0:.6f}, {1:.6f}").format(
+                    center_point.x(), center_point.y())
+            
             self.current_coord_label.setText(coord_text)
 
-            # 计算并显示瓦片信息
+            # 计算并显示瓦片信息（始终使用WGS84坐标进行瓦片计算）
+            wgs84_point = self.get_center_point('EPSG:4326')
             tile_type_text = self.tile_type_combo.currentText()
             level = int(self.level_combo.currentText())
 
@@ -384,14 +403,23 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def set_point_layer(self):
         """设置点图层"""
         try:
+            # 获取当前选择坐标系的坐标
             c_p = self.get_center_point()
             point = QgsPointXY(c_p.x(), c_p.y())
 
-            # 创建图层名称
-            layer_name = self.tr("marker_{0:.6f}_{1:.6f}").format(point.x(), point.y())
+            # 确定坐标系
+            coord_type = self.coord_type_combo.currentText()
+            if "3857" in coord_type:
+                crs_code = "EPSG:3857"
+                # 对于3857坐标系使用较少的小数位数
+                layer_name = self.tr("marker_{0:.2f}_{1:.2f}").format(point.x(), point.y())
+            else:
+                crs_code = "EPSG:4326"
+                # 对于4326坐标系使用更多的小数位数
+                layer_name = self.tr("marker_{0:.6f}_{1:.6f}").format(point.x(), point.y())
 
             # 创建点图层
-            layer = QgsVectorLayer("Point?crs=EPSG:4326", layer_name, "memory")
+            layer = QgsVectorLayer(f"Point?crs={crs_code}", layer_name, "memory")
 
             # 添加标签字段
             provider = layer.dataProvider()
@@ -401,7 +429,14 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # 创建要素
             feature = QgsFeature()
             feature.setGeometry(QgsGeometry.fromPointXY(point))
-            feature.setAttributes([f'{point.x():.6f}, {point.y():.6f}'])
+            
+            # 根据坐标系设置标签格式
+            if "3857" in coord_type:
+                label_text = f'{point.x():.2f}, {point.y():.2f}'
+            else:
+                label_text = f'{point.x():.6f}, {point.y():.6f}'
+            
+            feature.setAttributes([label_text])
             provider.addFeatures([feature])
             layer.updateExtents()
 
@@ -550,9 +585,15 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def update_tile_boundary(self):
         """更新tile边界显示"""
         try:
-            wgs84_point = self.get_center_point()
+            # 始终使用WGS84坐标进行瓦片边界计算
+            wgs84_point = self.get_center_point('EPSG:4326')
             tile_type_text = self.tile_type_combo.currentText()
             level = int(self.level_combo.currentText())
+            
+            # 获取当前canvas的坐标系，用于确定polygon的坐标系
+            canvas = iface.mapCanvas()
+            canvas_crs = canvas.mapSettings().destinationCrs()
+            canvas_crs_code = canvas_crs.authid()
 
             if tile_type_text == "NDS":
                 if level > 13:
@@ -565,6 +606,15 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             else:  # XYZ
                 mx, my = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), level)
                 polygon = get_x_y_bounds_polygon(mx, my, level, tile_type=CoordinatesSystemType.XYZ)
+
+            # 如果是3857坐标系，则将polygon转成魔卡托坐标polygon
+            if canvas_crs_code == "EPSG:3857":
+                new_polygon_arr =  []
+                for x,y in polygon.exterior.coords:
+                    x,y = lonlat_to_mercator(x,y)
+                    new_polygon_arr.append((x,y))
+                polygon = Polygon(new_polygon_arr)
+            
 
             if hasattr(self, 'crosshair') and self.crosshair:
                 self.crosshair.set_tile_boundary(polygon)
@@ -669,6 +719,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             layer_type = "Geometry"
 
         if self.create_layer_checkbox.isChecked():
+            # 根据坐标类型选择默认坐标系（WKT通常假设为WGS84）
             layer = QgsVectorLayer(f"{layer_type}?crs=EPSG:4326", layer_name, "memory")
 
             feature = QgsFeature()
@@ -686,21 +737,33 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         QMessageBox.information(self, self.tr("Success"),
                                 self.tr("WKT data processed successfully and layer created: {0}").format(layer_name))
 
-    def get_center_point(self):
-        """获取屏幕中心点的WGS84坐标"""
+    def get_center_point(self, target_crs_code=None):
+        """获取屏幕中心点坐标
+        
+        Args:
+            target_crs_code: 目标坐标系代码，如果为None则根据UI选择确定
+        """
         canvas = iface.mapCanvas()
         center_point = canvas.center()
 
+        # 如果没有指定目标坐标系，则根据UI选择确定
+        if target_crs_code is None:
+            coord_type = self.coord_type_combo.currentText()
+            if "3857" in coord_type:
+                target_crs_code = 'EPSG:3857'
+            else:
+                target_crs_code = 'EPSG:4326'
+        
         canvas_crs = canvas.mapSettings().destinationCrs()
-        wgs84_crs = QgsCoordinateReferenceSystem('EPSG:4326')
+        target_crs = QgsCoordinateReferenceSystem(target_crs_code)
 
-        if canvas_crs != wgs84_crs:
-            transform = QgsCoordinateTransform(canvas_crs, wgs84_crs, QgsProject.instance())
-            wgs84_point = transform.transform(center_point)
+        if canvas_crs != target_crs:
+            transform = QgsCoordinateTransform(canvas_crs, target_crs, QgsProject.instance())
+            transformed_point = transform.transform(center_point)
         else:
-            wgs84_point = center_point
+            transformed_point = center_point
 
-        return wgs84_point
+        return transformed_point
 
     def copy_current_coord(self):
         """复制当前屏幕中心坐标"""
@@ -714,7 +777,8 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def copy_nds_tile_id(self):
         """复制NDS瓦片ID信息"""
-        center_point = self.get_center_point()
+        # 始终使用WGS84坐标进行瓦片计算
+        center_point = self.get_center_point('EPSG:4326')
         level = int(self.level_combo.currentText())
 
         if self.tile_type_combo.currentText() == "NDS":

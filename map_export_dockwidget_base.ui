@@ -54,11 +54,6 @@
                                                                     <string>Web Mercator (EPSG:3857)</string>  <!-- 修改 -->
                                                                 </property>
                                                             </item>
-                                                            <item>
-                                                                <property name="text">
-                                                                    <string>UTM Coordinates</string>  <!-- 修改 -->
-                                                                </property>
-                                                            </item>
                                                         </widget>
                                                     </item>
                                                 </layout>
@@ -644,7 +639,6 @@
                                         </property>
                                     </widget>
                                 </item>
-
                             </layout>
                         </widget>
                     </widget>
