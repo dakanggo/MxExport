@@ -10,7 +10,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QPainter, QPen, QColor, QBrush
 from qgis.PyQt.QtWidgets import QWidget, QMessageBox
 from qgis.gui import QgsMapCanvas
-from qgis.core import QgsGeometry, QgsPointXY, QgsCoordinateReferenceSystem
+from qgis.core import QgsGeometry, QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
 from qgis.utils import iface
 
 
