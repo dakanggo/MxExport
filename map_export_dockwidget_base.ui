@@ -54,6 +54,16 @@
                                                                     <string>Web Mercator (EPSG:3857)</string>  <!-- 修改 -->
                                                                 </property>
                                                             </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">NDS TileID</string>
+                                                                </property>
+                                                            </item>
+                                                            <item>
+                                                                <property name="text">
+                                                                    <string notr="true">XYZ Tile</string>
+                                                                </property>
+                                                            </item>
                                                         </widget>
                                                     </item>
                                                 </layout>
@@ -63,7 +73,7 @@
                                                     <item>
                                                         <widget class="QLabel" name="x_y_label">
                                                             <property name="text">
-                                                                <string>X,Y/Longitude,Latitude:</string>  <!-- 修改 -->
+                                                                <string>Input:</string>  <!-- 修改 -->
                                                             </property>
                                                         </widget>
                                                     </item>

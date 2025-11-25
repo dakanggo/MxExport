@@ -2,7 +2,7 @@
 name=MxExport
 qgisMinimumVersion=3.16
 description=MxExport is a QGIS plugin designed for GIS professionals, offering coordinate positioning, NDS/XYZ tile information display, WKT/GeoJSON data import, and layer management features to streamline geographic information processing workflows and enhance productivity.<br/>MxExport是专为GIS从业者开发的QGIS插件，提供坐标定位标记、NDS/XYZ瓦片信息显示、WKT/GeoJSON数据导入、图层管理等核心功能，简化地理信息处理流程，提升工作效率。
-version=2.1
+version=2.2
 author=DaKang
 email=dakanggo@gmail.com
 
@@ -20,6 +20,12 @@ icon=dakang_icon.png
 experimental=False
 deprecated=False
 changelog=
+    Version 2.2
+    - Support GeoJSON Properties: preserve and display properties data in layer attributes.
+    - Dynamic coordinate input labels: auto-switch labels based on coordinate format selection.
+    - Auto-fill coordinates: automatically display current coordinates when switching coordinate formats.
+    - Fix GeoJSON processing bugs and improve coordinate transformation accuracy.
+    - Add comprehensive i18n support with translations for Chinese (Simplified/Traditional) and Japanese.
     Version 2.1
     - Release 2.1, fix bugs and add EPSG 3857 support.
     Version 2.0

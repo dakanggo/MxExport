@@ -357,5 +357,75 @@
                                                 href=&quot;mailto:yujikang@mxnavi.com&quot;&gt;&lt;span
                                                 style=&quot;color:#3498db; text-decoration:none; font-weight:400;&quot;&gt;yujikang@mxnavi.com&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="343"/>
+        <source>NDS TileID:</source>
+        <translation>NDS 瓦片ID:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="351"/>
+        <source>X, Y, Z (Level):</source>
+        <translation>X, Y, Z (级别):</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="357"/>
+        <source>Longitude, Latitude:</source>
+        <translation>经度, 纬度:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="363"/>
+        <source>X, Y (EPSG:3857):</source>
+        <translation>X, Y (EPSG:3857):</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="500"/>
+        <source>NDS TileID must be an integer</source>
+        <translation>NDS 瓦片ID必须是整数</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="513"/>
+        <source>Please enter X, Y, Z coordinates</source>
+        <translation>请输入 X, Y, Z 坐标</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="521"/>
+        <source>X, Y and Z must be integers</source>
+        <translation>X, Y 和 Z 必须是整数</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="76"/>
+        <source>Input:</source>
+        <translation>输入:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="59"/>
+        <source>NDS TileID</source>
+        <translation>NDS 瓦片ID</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="64"/>
+        <source>XYZ Tile</source>
+        <translation>XYZ 瓦片</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="374"/>
+        <source>marker_{0:.2f}_{1:.2f}</source>
+        <translation>标记点_{0:.2f}_{1:.2f}</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="810"/>
+        <source>Invalid GeoJSON format</source>
+        <translation>无效的 GeoJSON 格式</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="912"/>
+        <source>GeoJSON data processed successfully and layer created: {0}</source>
+        <translation>GeoJSON 数据处理成功并创建图层: {0}</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="916"/>
+        <source>Error processing GeoJSON data: {0}</source>
+        <translation>处理 GeoJSON 数据时出错: {0}</translation>
+    </message>
 </context>
 </TS>

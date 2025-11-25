@@ -357,5 +357,75 @@
                                                 href=&quot;mailto:yujikang@mxnavi.com&quot;&gt;&lt;span
                                                 style=&quot;color:#3498db; text-decoration:none; font-weight:400;&quot;&gt;yujikang@mxnavi.com&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="343"/>
+        <source>NDS TileID:</source>
+        <translation>NDS タイルID:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="351"/>
+        <source>X, Y, Z (Level):</source>
+        <translation>X, Y, Z (レベル):</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="357"/>
+        <source>Longitude, Latitude:</source>
+        <translation>経度, 緯度:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="363"/>
+        <source>X, Y (EPSG:3857):</source>
+        <translation>X, Y (EPSG:3857):</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="500"/>
+        <source>NDS TileID must be an integer</source>
+        <translation>NDS タイルIDは整数である必要があります</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="513"/>
+        <source>Please enter X, Y, Z coordinates</source>
+        <translation>X, Y, Z座標を入力してください</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="521"/>
+        <source>X, Y and Z must be integers</source>
+        <translation>X、Y、Zは整数である必要があります</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="76"/>
+        <source>Input:</source>
+        <translation>入力:</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="59"/>
+        <source>NDS TileID</source>
+        <translation>NDS タイルID</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget_base.ui" line="64"/>
+        <source>XYZ Tile</source>
+        <translation>XYZ タイル</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="374"/>
+        <source>marker_{0:.2f}_{1:.2f}</source>
+        <translation>マーカー_{0:.2f}_{1:.2f}</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="810"/>
+        <source>Invalid GeoJSON format</source>
+        <translation>無効な GeoJSON 形式</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="912"/>
+        <source>GeoJSON data processed successfully and layer created: {0}</source>
+        <translation>GeoJSON データが正常に処理され、レイヤが作成されました: {0}</translation>
+    </message>
+    <message>
+        <location filename="../map_export_dockwidget.py" line="916"/>
+        <source>Error processing GeoJSON data: {0}</source>
+        <translation>GeoJSON データ処理エラー: {0}</translation>
+    </message>
 </context>
 </TS>
