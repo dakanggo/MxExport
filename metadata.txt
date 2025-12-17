@@ -21,6 +21,11 @@ experimental=False
 deprecated=False
 changelog=
     Version 2.3
+    - Enhance UI/UX: Improved interface layout and user experience.
+    - Optimize tile coordinate calculation: Better precision for NDS and XYZ tile systems.
+    - Add more coordinate system support: Enhanced compatibility with various EPSG codes.
+    - Fix coordinate display bugs: Improve accuracy of coordinate positioning and display.
+    - Performance improvement: Optimize plugin loading and data processing speed.
 
     Version 2.2
     - Support GeoJSON Properties: preserve and display properties data in layer attributes.
