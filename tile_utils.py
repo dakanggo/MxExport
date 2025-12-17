@@ -9,15 +9,12 @@ from typing import Any
 import enum
 
 import numpy as np
-from shapely.geometry.point import Point
-from shapely.geometry.polygon import Polygon
-from shapely.strtree import STRtree
 
 
 class CoordinatesSystemType(enum.Enum):
-    WGS84 = 0,
-    NDS = 1,
-    XYZ = 2,
+    WGS84 = (0,)
+    NDS = (1,)
+    XYZ = (2,)
     MERCATOR = 3
 
 
@@ -75,15 +72,15 @@ def nds_to_wgs84(x, tile_level, y_flag=False):
         # x
         v = x << (31 - tile_level)
         v = to_signed_32bit(v)
-        d = v * 360 / (2 ** 32)
+        d = v * 360 / (2**32)
     else:
         v = x << (31 - tile_level)
-        v |= (2 ** (31 - tile_level - 1))
-        v -= (2 ** (31 - tile_level - 1))
-        if v & 2 ** 30:
+        v |= 2 ** (31 - tile_level - 1)
+        v -= 2 ** (31 - tile_level - 1)
+        if v & 2**30:
             v |= 0x80000000
         v = to_signed_32bit(v)
-        d = v * 180 / (2 ** 31)
+        d = v * 180 / (2**31)
     return d
 
 
@@ -108,12 +105,12 @@ def encode_tile_id(x, y, level=13, is_wgs84=False):
     else:
         nds_x = int(x)
         nds_y = int(y)
-    tile_id = (1 << (level + 16))
+    tile_id = 1 << (level + 16)
     # Morton code calculate
 
     for i in range(level + 1):
-        tile_id |= (((nds_x & (1 << i)) >> i) << (2 * i))
-        tile_id |= (((nds_y & (1 << i)) >> i) << (2 * i + 1))
+        tile_id |= ((nds_x & (1 << i)) >> i) << (2 * i)
+        tile_id |= ((nds_y & (1 << i)) >> i) << (2 * i + 1)
     return tile_id
 
 
@@ -135,7 +132,7 @@ def parse_tile_id_2_nds(tile_id, tile_level=None):
     morton_code = tile_id
     current_level = parse_tile_level(tile_id)
     for i in range(current_level + 1):
-        move_bit = (i * 2)
+        move_bit = i * 2
         nds_x |= (morton_code & 1 << move_bit) >> i
         nds_y |= (morton_code & 1 << (move_bit + 1)) >> (i + 1)
     if current_level == 0 and tile_id == 65537:
@@ -164,21 +161,27 @@ def parse_tile_level(tile_id):
         raise e
 
 
-def get_adjacent_tiles(p: Point, meters=50):
+def get_adjacent_tiles(p, meters=50):
     """
     获取周边Tile
     Args:
-        p:
+        p: 点坐标 (x, y) 元组或包含 x, y 属性的对象
         meters:
 
     Returns:
 
     """
+    # 支持元组或对象
+    if isinstance(p, tuple):
+        px, py = p
+    else:
+        px, py = p.x, p.y
+
     degree_m = meters * 1e-5 / 2
-    left_top = p.x - degree_m, p.y + degree_m
-    left_bottom = p.x - degree_m, p.y - degree_m
-    right_top = p.x + degree_m, p.y + degree_m
-    right_bottom = p.x + degree_m, p.y - degree_m
+    left_top = px - degree_m, py + degree_m
+    left_bottom = px - degree_m, py - degree_m
+    right_top = px + degree_m, py + degree_m
+    right_bottom = px + degree_m, py - degree_m
 
     tiles = set()
     tiles.add(encode_tile_id(*left_top, is_wgs84=True))
@@ -194,44 +197,56 @@ def get_around_tiles(tile_id, tile_level=None) -> list:
 
     x, y = parse_tile_id_2_nds(tile_id, tile_level)
 
-    tile_ids = [encode_tile_id(x + 1, y + 1, tile_level),
-                encode_tile_id(x + 1, y, tile_level),
-                encode_tile_id(x + 1, y - 1, tile_level),
-                encode_tile_id(x, y + 1, tile_level),
-                encode_tile_id(x, y - 1, tile_level),
-                encode_tile_id(x - 1, y + 1, tile_level),
-                encode_tile_id(x - 1, y, tile_level),
-                encode_tile_id(x - 1, y - 1, tile_level)]
+    tile_ids = [
+        encode_tile_id(x + 1, y + 1, tile_level),
+        encode_tile_id(x + 1, y, tile_level),
+        encode_tile_id(x + 1, y - 1, tile_level),
+        encode_tile_id(x, y + 1, tile_level),
+        encode_tile_id(x, y - 1, tile_level),
+        encode_tile_id(x - 1, y + 1, tile_level),
+        encode_tile_id(x - 1, y, tile_level),
+        encode_tile_id(x - 1, y - 1, tile_level),
+    ]
 
     return tile_ids
 
 
-def get_tile_boundary_polygon(tile_id, xyz=False, expand=(0, 0), expand_percent=True) -> Polygon:
+def get_tile_boundary_polygon(tile_id, xyz=False, expand=(0, 0), expand_percent=True):
     """
-    获取Tile边界
+    获取Tile边界（返回坐标列表）
     :param tile_id:
     :param xyz:
     :param expand: 外扩
     :param expand_percent: 外扩为百分比
-    :return:
+    :return: 坐标列表 [(x1, y1), (x2, y2), ...]
 
     Args:
         xyz:  标记是否是xyz坐标 false 是wgs84坐标
     """
-    longitudes_min, longitudes_max, latitudes_min, latitudes_max = get_tile_boundary(tile_id, xyz,
-                                                                                     expand,
-                                                                                     expand_percent)
-    poly = Polygon([(longitudes_min, latitudes_min), (longitudes_max, latitudes_min),
-                    (longitudes_max, latitudes_max), (longitudes_min, latitudes_max)])
+    longitudes_min, longitudes_max, latitudes_min, latitudes_max = get_tile_boundary(
+        tile_id, xyz, expand, expand_percent
+    )
+    # 返回坐标列表（闭合多边形）
+    poly_coords = [
+        (longitudes_min, latitudes_min),
+        (longitudes_max, latitudes_min),
+        (longitudes_max, latitudes_max),
+        (longitudes_min, latitudes_max),
+        (longitudes_min, latitudes_min),
+    ]
 
-    return poly
+    return poly_coords
 
 
-def get_tile_bounds_polygon(tile_id,
-                            tile_type=CoordinatesSystemType.NDS,
-                            out_type=CoordinatesSystemType.WGS84,
-                            extent=4096, expand_bounds=(0, 0)) -> Polygon:
+def get_tile_bounds_polygon(
+    tile_id,
+    tile_type=CoordinatesSystemType.NDS,
+    out_type=CoordinatesSystemType.WGS84,
+    extent=4096,
+    expand_bounds=(0, 0),
+):
     """
+    获取Tile边界多边形（返回坐标列表）
 
     Parameters
     ----------
@@ -243,20 +258,26 @@ def get_tile_bounds_polygon(tile_id,
 
     Returns
     -------
-
+    坐标列表 [(x1, y1), (x2, y2), ...]
     """
     x_min, y_min, x_max, y_max = get_tile_bounds(tile_id, tile_type, out_type, extent, expand_bounds)
-    poly = Polygon([(x_min, y_min), (x_max, y_min),
-                    (x_max, y_max), (x_min, y_max), (x_min, y_min)])
+    # 返回坐标列表（闭合多边形）
+    poly_coords = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max), (x_min, y_min)]
 
-    return poly
+    return poly_coords
 
 
-def get_x_y_bounds_polygon(x, y, tile_level,
-                           tile_type=CoordinatesSystemType.NDS,
-                           out_type=CoordinatesSystemType.WGS84,
-                           extent=4096, expand_bounds=(0, 0)) -> Polygon:
+def get_x_y_bounds_polygon(
+    x,
+    y,
+    tile_level,
+    tile_type=CoordinatesSystemType.NDS,
+    out_type=CoordinatesSystemType.WGS84,
+    extent=4096,
+    expand_bounds=(0, 0),
+):
     """
+    获取XY边界多边形（返回坐标列表）
 
     Parameters
     ----------
@@ -270,17 +291,24 @@ def get_x_y_bounds_polygon(x, y, tile_level,
 
     Returns
     -------
-
+    坐标列表 [(x1, y1), (x2, y2), ...]
     """
     x_min, y_min, x_max, y_max = get_x_y_bounds(x, y, tile_level, tile_type, out_type, extent, expand_bounds)
-    poly = Polygon([(x_min, y_min), (x_max, y_min),
-                    (x_max, y_max), (x_min, y_max), (x_min, y_min)])
+    # 返回坐标列表（闭合多边形）
+    poly_coords = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max), (x_min, y_min)]
 
-    return poly
+    return poly_coords
 
 
-def get_x_y_bounds(nds_x, nds_y, tile_level, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84,
-                   extent=4096, expand_bounds=(0, 0)) -> tuple[Any, Any, Any, Any]:
+def get_x_y_bounds(
+    nds_x,
+    nds_y,
+    tile_level,
+    tile_type=CoordinatesSystemType.NDS,
+    out_type=CoordinatesSystemType.WGS84,
+    extent=4096,
+    expand_bounds=(0, 0),
+) -> tuple[Any, Any, Any, Any]:
     x_min, y_min, x_max, y_max, z = 0, 0, 0, 0, 0
 
     if tile_type == CoordinatesSystemType.NDS:
@@ -317,8 +345,13 @@ def get_x_y_bounds(nds_x, nds_y, tile_level, tile_type=CoordinatesSystemType.NDS
     return x_min, y_min, x_max, y_max
 
 
-def get_tile_bounds(tile_id, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84,
-                    extent=4096, expand_bounds=(0, 0)) -> tuple[Any, Any, Any, Any]:
+def get_tile_bounds(
+    tile_id,
+    tile_type=CoordinatesSystemType.NDS,
+    out_type=CoordinatesSystemType.WGS84,
+    extent=4096,
+    expand_bounds=(0, 0),
+) -> tuple[Any, Any, Any, Any]:
     x_min, y_min, x_max, y_max, z = 0, 0, 0, 0, 0
     tile_level = parse_tile_level(tile_id)
     nds_x, nds_y = parse_tile_id_2_nds(tile_id)
@@ -391,10 +424,7 @@ def get_tile_boundary(tile_id, xyz=False, expand=(0, 0), expand_percent=True):
         latitudes_min -= alt_expand
         latitudes_max += alt_expand
 
-    return (round(longitudes_min, 7),
-            round(longitudes_max, 7),
-            round(latitudes_min, 7),
-            round(latitudes_max, 7))
+    return (round(longitudes_min, 7), round(longitudes_max, 7), round(latitudes_min, 7), round(latitudes_max, 7))
 
 
 def get_gridding_coordinate(x, y, x_min, x_max, y_min, y_max, turn_y_axis=True, extent=4096):
@@ -423,9 +453,16 @@ def get_gridding_coordinate(x, y, x_min, x_max, y_min, y_max, turn_y_axis=True, 
     return x, y
 
 
-def get_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
-                                     latitudes_min=None, latitudes_max=None,
-                                     longitudes_min=None, longitudes_max=None, turn_y_axis=True):
+def get_gridding_coordinate_by_wgs84(
+    wgs84_x,
+    wgs84_y,
+    extent=4096,
+    latitudes_min=None,
+    latitudes_max=None,
+    longitudes_min=None,
+    longitudes_max=None,
+    turn_y_axis=True,
+):
     """
     获取分格坐标
     Args:
@@ -443,7 +480,8 @@ def get_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
     """
     if latitudes_min is None or latitudes_max is None or longitudes_min is None or longitudes_max is None:
         longitudes_min, longitudes_max, latitudes_min, latitudes_max = get_tile_boundary(
-            encode_tile_id(wgs84_x, wgs84_y, is_wgs84=True))
+            encode_tile_id(wgs84_x, wgs84_y, is_wgs84=True)
+        )
     lat_step = (latitudes_max - latitudes_min) / extent
     lon_step = (longitudes_max - longitudes_min) / extent
     x = round((wgs84_x - longitudes_min) / lon_step, 0)
@@ -453,9 +491,16 @@ def get_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
     return x, y
 
 
-def get_xyz_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
-                                         latitudes_min=None, latitudes_max=None,
-                                         longitudes_min=None, longitudes_max=None, turn_y_axis=True):
+def get_xyz_gridding_coordinate_by_wgs84(
+    wgs84_x,
+    wgs84_y,
+    extent=4096,
+    latitudes_min=None,
+    latitudes_max=None,
+    longitudes_min=None,
+    longitudes_max=None,
+    turn_y_axis=True,
+):
     """
     获取分格坐标
     Args:
@@ -473,7 +518,8 @@ def get_xyz_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
     """
     if latitudes_min is None or latitudes_max is None or longitudes_min is None or longitudes_max is None:
         longitudes_min, longitudes_max, latitudes_min, latitudes_max = get_tile_boundary(
-            encode_tile_id(wgs84_x, wgs84_y, is_wgs84=True))
+            encode_tile_id(wgs84_x, wgs84_y, is_wgs84=True)
+        )
     lat_step = (latitudes_max - latitudes_min) / extent
     lon_step = (longitudes_max - longitudes_min) / extent
     x = round((wgs84_x - longitudes_min) / lon_step, 0)
@@ -483,9 +529,7 @@ def get_xyz_gridding_coordinate_by_wgs84(wgs84_x, wgs84_y, extent=4096,
     return x, y
 
 
-def get_wgs84_coordinate_by_grid(x, y,
-                                 latitudes_min, latitudes_max,
-                                 longitudes_min, longitudes_max, extent=4096):
+def get_wgs84_coordinate_by_grid(x, y, latitudes_min, latitudes_max, longitudes_min, longitudes_max, extent=4096):
     """
     获取分格坐标
     Args:
@@ -512,8 +556,11 @@ def lon2tile(lon, zoom):
 
 
 def lat2tile(lat, zoom):
-    return math.floor((1 - math.log(math.tan(lat * math.pi / 180) +
-                                    1 / math.cos(lat * math.pi / 180)) / math.pi) / 2 * math.pow(2, zoom))
+    return math.floor(
+        (1 - math.log(math.tan(lat * math.pi / 180) + 1 / math.cos(lat * math.pi / 180)) / math.pi)
+        / 2
+        * math.pow(2, zoom)
+    )
 
 
 originShift = 2 * math.pi * 6378137 / 2.0
@@ -552,8 +599,8 @@ def lonlat_to_mercator(lon, lat):
 
 def mercator_to_tile(x, y, z):
     # 计算瓦片坐标
-    tile_x = int((x + originShift) / (2 * originShift / (2 ** z)))
-    tile_y = int((originShift - y) / (2 * originShift / (2 ** z)))
+    tile_x = int((x + originShift) / (2 * originShift / (2**z)))
+    tile_y = int((originShift - y) / (2 * originShift / (2**z)))
 
     return tile_x, tile_y
 
@@ -566,8 +613,8 @@ def latlon_to_xyz(lon, lat, zoom):
 
 def tile_to_mercator(x, y, z):
     # 计算 Web Mercator 坐标
-    mx = (x / (2 ** z)) * 2 * originShift - originShift
-    my = originShift - (y / (2 ** z)) * 2 * originShift
+    mx = (x / (2**z)) * 2 * originShift - originShift
+    my = originShift - (y / (2**z)) * 2 * originShift
     return mx, my
 
 
@@ -596,7 +643,7 @@ def latlon_to_xyz_old(lon, lat, zoom):
      :param lon: 经度
      :param zoom: 缩放级别
      :return: (z, x, y) TMS切图坐标
-     """
+    """
     return lon2tile(lon, zoom), lat2tile(lat, zoom)
 
 
@@ -623,37 +670,51 @@ def get_xyz_cover_tiles(x, y, z):
     return list(tile_ids_arr)
 
 
-def rasterize_polygon(polygon: Polygon, resolution: float):
+def rasterize_polygon(polygon_coords, resolution: float):
     """
-    将 Shapely Polygon 栅格化，返回按指定分辨率生成的点列表。
+    将多边形栅格化，返回按指定分辨率生成的点列表。
     Args:
-        polygon (Polygon): Shapely 多边形对象
+        polygon_coords: 多边形坐标列表 [(x1, y1), (x2, y2), ...]
         resolution (float): 栅格化步长，即每个像素（点）间距
     Returns:
         List[Tuple[float, float]]: 多边形内采样的点列表
     """
-    minx, miny, maxx, maxy = polygon.bounds
+    # 计算边界框
+    x_coords_list = [coord[0] for coord in polygon_coords]
+    y_coords_list = [coord[1] for coord in polygon_coords]
+    minx, maxx = min(x_coords_list), max(x_coords_list)
+    miny, maxy = min(y_coords_list), max(y_coords_list)
+
     x_coords = np.arange(minx, maxx, resolution)
     y_coords = np.arange(miny, maxy, resolution)
 
-    points = []
+    # 创建 QgsGeometry 用于点包含测试
+    from qgis.core import QgsGeometry, QgsPointXY
 
+    # 创建多边形几何 - 使用 QgsGeometry.fromPolygonXY 更可靠
+    points = [QgsPointXY(x, y) for x, y in polygon_coords]
+    # 确保多边形闭合（第一个点和最后一个点相同）
+    if len(points) > 0 and points[0] != points[-1]:
+        points.append(points[0])
+    poly_geom = QgsGeometry.fromPolygonXY([points])
+
+    filter_points = []
     for x in x_coords:
         for y in y_coords:
-            pt = Point(x, y)
-            points.append(pt)
-    if len(points) == 1:
-        return [(points[0].x, points[0].y)]
-    tree = STRtree(points)
-    idx_arr = tree.query(polygon, predicate='contains')
-    filter_points = [(points[i].x, points[i].y) for i in idx_arr]
+            pt = QgsPointXY(x, y)
+            pt_geom = QgsGeometry.fromPointXY(pt)
+            if poly_geom.contains(pt_geom):
+                filter_points.append((x, y))
+
     return filter_points
 
 
-def get_tiles_by_tile_id(tile_id,
-                         input_tile_schema=CoordinatesSystemType.NDS,
-                         output_tile_schema=CoordinatesSystemType.XYZ,
-                         output_tile_level=13):
+def get_tiles_by_tile_id(
+    tile_id,
+    input_tile_schema=CoordinatesSystemType.NDS,
+    output_tile_schema=CoordinatesSystemType.XYZ,
+    output_tile_level=13,
+):
     """
     获取瓦片ID
     :param tile_id:
@@ -662,8 +723,8 @@ def get_tiles_by_tile_id(tile_id,
     :param output_tile_level:
     :return:
     """
-    poly = get_tile_bounds_polygon(tile_id, tile_type=input_tile_schema)
-    points = rasterize_polygon(poly, 0.005 * (2 ** (13 - output_tile_level)))
+    poly_coords = get_tile_bounds_polygon(tile_id, tile_type=input_tile_schema)
+    points = rasterize_polygon(poly_coords, 0.005 * (2 ** (13 - output_tile_level)))
     tiles = set()
     for point in points:
         x, y = point
@@ -678,9 +739,9 @@ def get_tiles_by_tile_id(tile_id,
     return tiles
 
 
-def get_tiles_by_tile_id_v2(tile_id,
-                            input_tile_schema=CoordinatesSystemType.NDS,
-                            output_tile_schema=CoordinatesSystemType.XYZ):
+def get_tiles_by_tile_id_v2(
+    tile_id, input_tile_schema=CoordinatesSystemType.NDS, output_tile_schema=CoordinatesSystemType.XYZ
+):
     """
     获取瓦片ID
     :param tile_id:

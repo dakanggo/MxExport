@@ -8,6 +8,7 @@
 
 import json
 import os
+import random
 import re
 from hmac import new
 
@@ -16,8 +17,10 @@ from qgis.core import (
     QgsCoordinateTransform,
     QgsFeature,
     QgsField,
+    QgsFields,
     QgsFillSymbol,
     QgsGeometry,
+    QgsJsonUtils,
     QgsLineSymbol,
     QgsMarkerSymbol,
     QgsMessageLog,
@@ -38,8 +41,6 @@ from qgis.PyQt.QtCore import QCoreApplication, QEvent, QSettings, Qt, QTimer, QT
 from qgis.PyQt.QtGui import QClipboard, QColor, QFont
 from qgis.PyQt.QtWidgets import QApplication, QMessageBox
 from qgis.utils import iface
-from shapely.geometry import mapping, shape
-from shapely.ops import unary_union
 
 from .map_export_crosshair_tool import CrosshairOverlay
 from .tile_utils import *
@@ -94,6 +95,24 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def tr(self, message):
         """翻译函数"""
         return QCoreApplication.translate('MapExportDockWidget', message)
+
+    def generate_random_color(self):
+        """生成随机颜色（排除过浅和过深的颜色）"""
+        # 生成 HSV 色彩空间中的颜色，确保颜色鲜艳且可见
+        import colorsys
+
+        # 色相：0-1 随机
+        hue = random.random()
+        # 饱和度：0.5-0.9 确保颜色鲜艳
+        saturation = random.uniform(0.5, 0.9)
+        # 明度：0.4-0.8 避免过深或过浅
+        value = random.uniform(0.4, 0.8)
+
+        # 转换为 RGB
+        r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+
+        # 转换为十六进制颜色
+        return '#{:02x}{:02x}{:02x}'.format(int(r * 255), int(g * 255), int(b * 255))
 
     def setup_default_values(self):
         """设置默认值"""
@@ -488,13 +507,14 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             provider.addFeatures([feature])
             layer.updateExtents()
 
-            # 设置符号样式
+            # 设置符号样式（使用随机颜色和更小的尺寸）
+            random_color = self.generate_random_color()
             symbol_properties = {
                 'name': 'star',
-                'size': '6',
-                'color': '#4A90E2',
+                'size': '4',  # 从 6 改为 4，更小
+                'color': random_color,
                 'outline_color': '#FFFFFF',
-                'outline_width': '0.5',
+                'outline_width': '0.3',  # 从 0.5 改为 0.3，更细
                 'outline_style': 'solid',
             }
             symbol = QgsMarkerSymbol.createSimple(symbol_properties)
@@ -641,7 +661,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             x, y = parse_tile_id_2_nds(tile_id)
 
             # 获取Tile边界（WGS84坐标）
-            x_min, y_min, x_max, y_max = get_tile_bounds(tile_id, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84)
+            x_min, y_min, x_max, y_max = get_tile_bounds(
+                tile_id, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84
+            )
 
             # 计算中心点
             center_x = (x_min + x_max) / 2
@@ -655,7 +677,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         """根据XYZ坐标获取中心点（WGS84）"""
         try:
             # 获取XYZ Tile的边界
-            x_min, y_min, x_max, y_max = get_x_y_bounds(x, y, level, tile_type=CoordinatesSystemType.XYZ, out_type=CoordinatesSystemType.WGS84)
+            x_min, y_min, x_max, y_max = get_x_y_bounds(
+                x, y, level, tile_type=CoordinatesSystemType.XYZ, out_type=CoordinatesSystemType.WGS84
+            )
 
             # 计算中心点
             center_x = (x_min + x_max) / 2
@@ -669,7 +693,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         """根据NDS XY坐标获取中心点（WGS84）"""
         try:
             # 获取NDS坐标对应的边界
-            x_min, y_min, x_max, y_max = get_x_y_bounds(x, y, level, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84)
+            x_min, y_min, x_max, y_max = get_x_y_bounds(
+                x, y, level, tile_type=CoordinatesSystemType.NDS, out_type=CoordinatesSystemType.WGS84
+            )
 
             # 计算中心点
             center_x = (x_min + x_max) / 2
@@ -697,7 +723,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.update_button_texts()
 
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error toggling crosshair display: {0}").format(str(e)))
+            QMessageBox.critical(
+                self, self.tr("Error"), self.tr("Error toggling crosshair display: {0}").format(str(e))
+            )
 
     def toggle_tile_boundary(self):
         """切换tile边界显示"""
@@ -716,7 +744,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.update_button_texts()
 
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error toggling tile boundary display: {0}").format(str(e)))
+            QMessageBox.critical(
+                self, self.tr("Error"), self.tr("Error toggling tile boundary display: {0}").format(str(e))
+            )
 
     def update_tile_boundary(self):
         """更新tile边界显示"""
@@ -745,10 +775,10 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # 如果是3857坐标系，则将polygon转成魔卡托坐标polygon
             if canvas_crs_code == "EPSG:3857":
                 new_polygon_arr = []
-                for x, y in polygon.exterior.coords:
+                for x, y in polygon:  # polygon 现在是坐标列表
                     x, y = lonlat_to_mercator(x, y)
                     new_polygon_arr.append((x, y))
-                polygon = Polygon(new_polygon_arr)
+                polygon = new_polygon_arr
 
             if hasattr(self, 'crosshair') and self.crosshair:
                 self.crosshair.set_tile_boundary(polygon)
@@ -776,6 +806,52 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         elif current_tab == 0:  # 坐标转换标签页
             self.goto_coordinate()
 
+    def create_geometry_from_geojson(self, geometry_data):
+        """从GeoJSON geometry对象创建QgsGeometry
+
+        Args:
+            geometry_data: GeoJSON geometry 对象字典
+
+        Returns:
+            QgsGeometry对象，如果失败则返回None
+        """
+        geom = None
+        geom_type = geometry_data.get('type', '')
+        coords = geometry_data.get('coordinates', [])
+
+        try:
+            # 根据类型直接从坐标创建
+            if geom_type == 'Point':
+                if len(coords) >= 2:
+                    geom = QgsGeometry.fromPointXY(QgsPointXY(coords[0], coords[1]))
+            elif geom_type == 'LineString':
+                if len(coords) >= 2:
+                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords]
+                    geom = QgsGeometry.fromPolylineXY(points)
+            elif geom_type == 'Polygon':
+                if len(coords) >= 1 and len(coords[0]) >= 3:
+                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords[0]]
+                    geom = QgsGeometry.fromPolygonXY([points])
+            elif geom_type == 'MultiPoint':
+                if len(coords) >= 1:
+                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords]
+                    geom = QgsGeometry.fromMultiPointXY(points)
+            elif geom_type == 'MultiLineString':
+                if len(coords) >= 1:
+                    lines = [[QgsPointXY(coord[0], coord[1]) for coord in line] for line in coords]
+                    geom = QgsGeometry.fromMultiPolylineXY(lines)
+            elif geom_type == 'MultiPolygon':
+                if len(coords) >= 1:
+                    polygons = [
+                        [[QgsPointXY(coord[0], coord[1]) for coord in ring] for ring in poly] for poly in coords
+                    ]
+                    geom = QgsGeometry.fromMultiPolygonXY(polygons)
+        except Exception as e:
+            QgsMessageLog.logMessage(f"Error creating geometry from coordinates: {str(e)}", "MxExport Plugin")
+            geom = None
+
+        return geom
+
     def process_wkt_geojson(self):
         """处理WKT/GeoJSON数据"""
         input_text = self.wkt_text_edit.toPlainText().strip()
@@ -798,18 +874,51 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # 判断是WKT还是GeoJSON
             if input_text.startswith(('{', '[')):
                 geojson_data = json.loads(input_text)
-                if 'type' not in geojson_data or geojson_data['type'] == 'FeatureCollection':
+
+                # 处理数组格式（可能是 FeatureCollection 的简化形式）
+                if isinstance(geojson_data, list):
+                    geojson_data = {"type": "FeatureCollection", "features": geojson_data}
+
+                # 检查 GeoJSON 类型
+                if not isinstance(geojson_data, dict) or 'type' not in geojson_data:
+                    QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid GeoJSON format"))
+                    return
+
+                geojson_type = geojson_data['type']
+
+                if geojson_type == 'FeatureCollection':
                     # FeatureCollection - 创建一个图层，包含多个要素
                     self.process_geojson_collection(geojson_data, layer_name)
                     return
-                elif geojson_data['type'] == 'Feature':
-                    geom = shape(geojson_data['geometry'])
-                    if geom.is_empty:
-                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty"))
+                elif geojson_type == 'Feature':
+                    # Feature 对象 - 提取 geometry 并处理
+                    if 'geometry' not in geojson_data:
+                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON Feature missing geometry"))
                         return
-                    input_text = geom.wkt
+                    geom = self.create_geometry_from_geojson(geojson_data['geometry'])
+                    if geom is None or geom.isNull() or geom.isEmpty():
+                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON geometry is empty"))
+                        return
+                    input_text = geom.asWkt()
+                elif geojson_type in [
+                    'Point',
+                    'LineString',
+                    'Polygon',
+                    'MultiPoint',
+                    'MultiLineString',
+                    'MultiPolygon',
+                    'GeometryCollection',
+                ]:
+                    # 纯 Geometry 对象 - 直接处理
+                    geom = self.create_geometry_from_geojson(geojson_data)
+                    if geom is None or geom.isNull() or geom.isEmpty():
+                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON geometry is empty"))
+                        return
+                    input_text = geom.asWkt()
                 else:
-                    QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid GeoJSON format"))
+                    QMessageBox.warning(
+                        self, self.tr("Warning"), self.tr("Unsupported GeoJSON type: {0}").format(geojson_type)
+                    )
                     return
             else:
                 # 验证WKT格式
@@ -819,39 +928,138 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
             self.process_wkt(input_text, layer_name)
 
+        except json.JSONDecodeError as e:
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Invalid JSON format: {0}").format(str(e)))
+            QgsMessageLog.logMessage(f"JSON decode error: {str(e)}", "MxExport Plugin", QgsMessageLog.CRITICAL)
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error processing data: {0}").format(str(e)))
+            error_msg = str(e)
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Error processing data: {0}").format(error_msg))
+            QgsMessageLog.logMessage(
+                f"Error processing WKT/GeoJSON: {error_msg}\nInput: {input_text[:200]}",
+                "MxExport Plugin",
+                QgsMessageLog.CRITICAL,
+            )
 
     def process_geojson_collection(self, geojson_data, layer_name):
         """处理 GeoJSON FeatureCollection - 创建一个图层包含多个要素"""
         try:
-            features = geojson_data.get("features", [])
+            # 处理不同的输入格式
+            if isinstance(geojson_data, list):
+                # 如果是列表，假设是 features 列表
+                features = geojson_data
+            elif isinstance(geojson_data, dict):
+                if geojson_data.get('type') == 'FeatureCollection':
+                    features = geojson_data.get("features", [])
+                elif geojson_data.get('type') == 'Feature':
+                    # 单个 Feature，转换为列表
+                    features = [geojson_data]
+                else:
+                    # 可能是纯 Geometry，转换为 Feature
+                    features = [{"type": "Feature", "geometry": geojson_data, "properties": {}}]
+            else:
+                QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid GeoJSON format"))
+                return
+
             if not features:
                 QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty"))
                 return
+
+            QgsMessageLog.logMessage(f"Processing {len(features)} features", "MxExport Plugin")
 
             # 提取所有几何体、properties并确定最合适的图层类型
             geoms_and_props = []
             geom_types = set()
             all_properties_keys = set()
 
-            for feature in features:
+            for idx, feature in enumerate(features):
+                QgsMessageLog.logMessage(f"Processing feature {idx}: {json.dumps(feature)[:200]}", "MxExport Plugin")
                 try:
-                    geom = shape(feature["geometry"])
-                    if not geom.is_empty:
+                    # 处理不同的 feature 格式
+                    if isinstance(feature, dict):
+                        if feature.get('type') == 'Feature':
+                            geometry_data = feature.get("geometry")
+                        elif 'type' in feature and feature['type'] in [
+                            'Point',
+                            'LineString',
+                            'Polygon',
+                            'MultiPoint',
+                            'MultiLineString',
+                            'MultiPolygon',
+                        ]:
+                            # 纯 Geometry 对象
+                            geometry_data = feature
+                        else:
+                            QgsMessageLog.logMessage(f"Warning: Unknown feature format: {feature}", "MxExport Plugin")
+                            continue
+                    else:
+                        QgsMessageLog.logMessage(f"Warning: Feature is not a dict: {type(feature)}", "MxExport Plugin")
+                        continue
+
+                    if geometry_data is None:
+                        QgsMessageLog.logMessage("Warning: Feature missing geometry", "MxExport Plugin")
+                        continue
+
+                    # 使用统一的辅助函数创建几何体
+                    geom_json = json.dumps(geometry_data)
+                    QgsMessageLog.logMessage(f"Geometry JSON: {geom_json[:200]}", "MxExport Plugin")
+
+                    geom = self.create_geometry_from_geojson(geometry_data)
+
+                    if geom is None:
+                        geom = QgsGeometry()  # 创建空几何体
+
+                    geom_type = geometry_data.get('type', 'Unknown')
+                    QgsMessageLog.logMessage(
+                        f"Geometry created: type={geom_type}, isNull={geom.isNull()}, isEmpty={geom.isEmpty()}, wkbType={geom.wkbType()}",
+                        "MxExport Plugin",
+                    )
+
+                    if geom.isNull():
+                        QgsMessageLog.logMessage(
+                            f"Warning: Geometry is null for feature: {json.dumps(feature)[:100]}", "MxExport Plugin"
+                        )
+                        continue
+
+                    if geom.isEmpty():
+                        QgsMessageLog.logMessage(
+                            f"Warning: Geometry is empty for feature: {json.dumps(feature)[:100]}", "MxExport Plugin"
+                        )
+                        continue
+
+                    if True:  # 改为始终处理非空几何
                         # 获取properties
-                        props = feature.get("properties", {})
+                        if isinstance(feature, dict) and 'properties' in feature:
+                            props = feature.get("properties", {})
+                        else:
+                            props = {}
                         if props:
                             all_properties_keys.update(props.keys())
+                        # 获取几何类型名称
+                        geom_type_name = QgsWkbTypes.displayString(geom.wkbType())
+                        # 转换为简化的类型名称
+                        if 'Point' in geom_type_name:
+                            geom_type_simple = 'Point'
+                        elif 'Line' in geom_type_name:
+                            geom_type_simple = 'LineString'
+                        elif 'Polygon' in geom_type_name:
+                            geom_type_simple = 'Polygon'
+                        else:
+                            geom_type_simple = geom_type_name
                         geoms_and_props.append((geom, props))
-                        geom_types.add(geom.geom_type)
+                        geom_types.add(geom_type_simple)
                 except Exception as e:
                     QgsMessageLog.logMessage(f"Warning: Failed to parse feature geometry: {str(e)}", "MxExport Plugin")
                     continue
 
             if not geoms_and_props:
-                QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty"))
+                error_msg = (
+                    f"No valid geometries found. Processed {len(features)} features. Check QGIS log for details."
+                )
+                QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty") + f"\n{error_msg}")
+                QgsMessageLog.logMessage(error_msg, "MxExport Plugin", QgsMessageLog.WARNING)
                 return
+
+            QgsMessageLog.logMessage(f"Successfully parsed {len(geoms_and_props)} geometries", "MxExport Plugin")
 
             # 确定图层类型（如果有多种类型，使用 Geometry）
             if len(geom_types) == 1:
@@ -891,9 +1099,8 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 source_crs = QgsCoordinateReferenceSystem('EPSG:4326')
 
                 for geom, props in geoms_and_props:
-                    # 将 shapely 几何体转换为 WKT
-                    wkt = geom.wkt
-                    qgs_geom = QgsGeometry.fromWkt(wkt)
+                    # geom 已经是 QgsGeometry 对象，直接使用
+                    qgs_geom = geom
 
                     # 如果画布坐标系与源坐标系不同，进行转换
                     if canvas_crs_code != 'EPSG:4326':
@@ -916,16 +1123,30 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 provider.addFeatures(features_list)
                 layer.updateExtents()
 
-                # 根据几何类型设置符号样式
+                # 根据几何类型设置符号样式（使用随机颜色和更细的线条）
+                random_color = self.generate_random_color()
+
                 if layer_type == "Point":
-                    symbol_properties = {'name': 'circle', 'size': '5', 'color': '#4A90E2', 'outline_color': '#FFFFFF', 'outline_width': '0.5'}
+                    symbol_properties = {
+                        'name': 'circle',
+                        'size': '3',  # 从 5 改为 3，更小
+                        'color': random_color,
+                        'outline_color': '#FFFFFF',
+                        'outline_width': '0.3',  # 从 0.5 改为 0.3，更细
+                    }
                     symbol = QgsMarkerSymbol.createSimple(symbol_properties)
                 elif layer_type == "LineString":
-                    symbol = QgsLineSymbol.createSimple({'line_color': '#4A90E2', 'line_width': '1'})
+                    symbol = QgsLineSymbol.createSimple(
+                        {'line_color': random_color, 'line_width': '0.5'}
+                    )  # 从 1 改为 0.5
                 elif layer_type == "Polygon":
-                    symbol = QgsFillSymbol.createSimple({'color': '#4A90E2', 'outline_color': '#2E5C8A', 'outline_width': '0.5'})
+                    # 多边形填充色使用半透明
+                    fill_color = random_color + '40'  # 添加透明度
+                    symbol = QgsFillSymbol.createSimple(
+                        {'color': fill_color, 'outline_color': random_color, 'outline_width': '0.5'}
+                    )
                 else:
-                    symbol = QgsLineSymbol.createSimple({'line_color': '#4A90E2', 'line_width': '1'})
+                    symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
 
                 renderer = QgsSingleSymbolRenderer(symbol)
                 layer.setRenderer(renderer)
@@ -938,7 +1159,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     canvas.refresh()
 
             QMessageBox.information(
-                self, self.tr("Success"), self.tr("GeoJSON data processed successfully and layer created: {0}").format(layer_name)
+                self,
+                self.tr("Success"),
+                self.tr("GeoJSON data processed successfully and layer created: {0}").format(layer_name),
             )
 
         except Exception as e:
@@ -986,13 +1209,42 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             layer.dataProvider().addFeatures([feature])
             layer.updateExtents()
 
+            # 为 WKT 图层也设置随机颜色和细线条
+            random_color = self.generate_random_color()
+
+            if layer_type == "Point":
+                symbol_properties = {
+                    'name': 'circle',
+                    'size': '3',
+                    'color': random_color,
+                    'outline_color': '#FFFFFF',
+                    'outline_width': '0.3',
+                }
+                symbol = QgsMarkerSymbol.createSimple(symbol_properties)
+            elif layer_type == "LineString":
+                symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
+            elif layer_type == "Polygon":
+                fill_color = random_color + '40'  # 半透明填充
+                symbol = QgsFillSymbol.createSimple(
+                    {'color': fill_color, 'outline_color': random_color, 'outline_width': '0.5'}
+                )
+            else:
+                symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
+
+            renderer = QgsSingleSymbolRenderer(symbol)
+            layer.setRenderer(renderer)
+
             QgsProject.instance().addMapLayer(layer)
 
             if self.zoom_layer_checkbox.isChecked():
                 iface.mapCanvas().setExtent(layer.extent())
                 iface.mapCanvas().refresh()
 
-        QMessageBox.information(self, self.tr("Success"), self.tr("WKT data processed successfully and layer created: {0}").format(layer_name))
+        QMessageBox.information(
+            self,
+            self.tr("Success"),
+            self.tr("WKT data processed successfully and layer created: {0}").format(layer_name),
+        )
 
     def get_center_point(self, target_crs_code=None):
         """获取屏幕中心点坐标

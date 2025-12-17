@@ -32,7 +32,7 @@ class CrosshairOverlay(QWidget):
 
     def get_center_point(self, target_crs_code='EPSG:4326'):
         """获取中心点坐标，支持不同的目标坐标系
-        
+
         Args:
             target_crs_code: 目标坐标系代码，如 'EPSG:4326' 或 'EPSG:3857'
         """
@@ -53,7 +53,7 @@ class CrosshairOverlay(QWidget):
         """绘制十字准线和tile边界"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
+
         # 获取画布坐标系的中心点，用于绘制
         canvas = iface.mapCanvas()
         center_point = canvas.center()
@@ -70,16 +70,12 @@ class CrosshairOverlay(QWidget):
             cross_gap = 8  # 中心留空
 
             # 绘制水平线（左、右两段）
-            painter.drawLine(center_x - cross_length, center_y,
-                             center_x - cross_gap, center_y)
-            painter.drawLine(center_x + cross_gap, center_y,
-                             center_x + cross_length, center_y)
+            painter.drawLine(center_x - cross_length, center_y, center_x - cross_gap, center_y)
+            painter.drawLine(center_x + cross_gap, center_y, center_x + cross_length, center_y)
 
             # 绘制垂直线（上、下两段）
-            painter.drawLine(center_x, center_y - cross_length,
-                             center_x, center_y - cross_gap)
-            painter.drawLine(center_x, center_y + cross_gap,
-                             center_x, center_y + cross_length)
+            painter.drawLine(center_x, center_y - cross_length, center_x, center_y - cross_gap)
+            painter.drawLine(center_x, center_y + cross_gap, center_x, center_y + cross_length)
 
             # 绘制中心点
             pen_center = QPen(QColor(255, 0, 0), 1, Qt.SolidLine)
@@ -102,21 +98,21 @@ class CrosshairOverlay(QWidget):
 
             # 获取polygon的边界点
             if self.tile_polygon:
-                exterior = self.tile_polygon.exterior
-                coords = list(exterior.coords)
+                # tile_polygon 现在是坐标列表
+                coords = self.tile_polygon if isinstance(self.tile_polygon, list) else list(self.tile_polygon)
 
                 # 转换坐标到屏幕坐标
                 screen_points = []
-                
+
                 # 获取canvas的坐标系信息
                 canvas = iface.mapCanvas()
                 canvas_crs = canvas.mapSettings().destinationCrs()
-                
+
                 for coord in coords:
                     # tile边界坐标已经是canvas坐标系下的坐标
                     # 直接创建QgsPointXY并转换为屏幕坐标
                     map_point = QgsPointXY(coord[0], coord[1])
-                    
+
                     # 使用canvas的坐标转换将地图坐标转换为屏幕坐标
                     canvas_point = self.canvas.getCoordinateTransform().transform(map_point)
                     screen_points.append((int(canvas_point.x()), int(canvas_point.y())))
@@ -126,8 +122,7 @@ class CrosshairOverlay(QWidget):
                     for i in range(len(screen_points)):
                         start_point = screen_points[i]
                         end_point = screen_points[(i + 1) % len(screen_points)]
-                        painter.drawLine(start_point[0], start_point[1],
-                                         end_point[0], end_point[1])
+                        painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
 
         except Exception as e:
             print(f"绘制tile边界时出错: {e}")
@@ -136,8 +131,13 @@ class CrosshairOverlay(QWidget):
             canvas_crs = canvas.mapSettings().destinationCrs()
             print(f"Canvas CRS: {canvas_crs.authid()}")
             if self.tile_polygon:
-                print(f"Tile polygon bounds: {self.tile_polygon.bounds}")
-                print(f"Tile polygon coords: {list(self.tile_polygon.exterior.coords)[:5]}...")  # 只打印前5个点
+                coords = self.tile_polygon if isinstance(self.tile_polygon, list) else list(self.tile_polygon)
+                if coords:
+                    x_coords = [c[0] for c in coords]
+                    y_coords = [c[1] for c in coords]
+                    bounds = (min(x_coords), min(y_coords), max(x_coords), max(y_coords))
+                    print(f"Tile polygon bounds: {bounds}")
+                    print(f"Tile polygon coords: {coords[:5]}...")  # 只打印前5个点
 
     def toggle_crosshair(self):
         """切换十字准线显示状态"""
