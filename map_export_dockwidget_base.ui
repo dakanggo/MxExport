@@ -32,7 +32,8 @@
     QTabBar::tab {
         background: #f1f2f6;
         border: 1px solid #dcdcdc;
-        padding: 8px 16px;
+        padding: 8px 20px;
+        min-width: 100px;
         margin-right: 2px;
         border-top-left-radius: 4px;
         border-top-right-radius: 4px;
@@ -752,90 +753,109 @@
        </attribute>
        <layout class="QVBoxLayout" name="about_layout">
         <property name="spacing">
-         <number>20</number>
+         <number>0</number>
         </property>
         <property name="leftMargin">
-         <number>30</number>
+         <number>0</number>
         </property>
         <property name="topMargin">
-         <number>30</number>
+         <number>0</number>
         </property>
         <property name="rightMargin">
-         <number>30</number>
+         <number>0</number>
         </property>
         <property name="bottomMargin">
-         <number>30</number>
+         <number>0</number>
         </property>
         <item>
-         <widget class="QLabel" name="title_label">
-          <property name="text">
-           <string notr="true">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:48pt; font-weight:300; color:#2c3e50; letter-spacing:2px;&quot;&gt;MxExport&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="subtitle_label">
-          <property name="text">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:20pt; font-weight:400; color:#7f8c8d; margin-top:10px;&quot;&gt;MxExport V2 - Geographic Data Export Tool&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-          <property name="wordWrap">
+         <widget class="QScrollArea" name="about_scroll">
+          <property name="widgetResizable">
            <bool>true</bool>
           </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="description_label">
-          <property name="text">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; color:#34495e; line-height:1.8; font-weight:300;&quot;&gt;Efficient GeoJSON and WKT format import tool&lt;br/&gt;Rich coordinate display and conversion functions&lt;br/&gt;Support for tile boundary display of various map services&lt;br/&gt;Suitable for map application development&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <property name="frameShape">
+           <enum>QFrame::NoFrame</enum>
           </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-          <property name="wordWrap">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="aboutSpacer">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>40</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <widget class="QLabel" name="author_label">
-          <property name="text">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:14pt; color:#7f8c8d; font-weight:400;&quot;&gt;Developer: DAKANG&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="email_label">
-          <property name="text">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:13pt; color:#95a5a6;&quot;&gt;Contact Email: &lt;/span&gt;&lt;a href=&quot;mailto:yujikang@mxnavi.com&quot;&gt;&lt;span style=&quot; color:#3498db; text-decoration:none; font-weight:400;&quot;&gt;yujikang@mxnavi.com&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-          <property name="openExternalLinks">
-           <bool>true</bool>
-          </property>
+          <widget class="QWidget" name="about_scroll_content">
+           <layout class="QVBoxLayout" name="about_inner_layout">
+            <property name="spacing">
+             <number>20</number>
+            </property>
+            <property name="leftMargin">
+             <number>25</number>
+            </property>
+            <property name="topMargin">
+             <number>30</number>
+            </property>
+            <property name="rightMargin">
+             <number>25</number>
+            </property>
+            <property name="bottomMargin">
+             <number>30</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="brand_label">
+              <property name="text">
+               <string notr="true">&lt;div style=&quot;background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3498db, stop:1 #2ecc71); padding: 20px; border-radius: 10px;&quot;&gt;
+    &lt;h1 style=&quot;color: #0b1f33; margin: 0; font-size: 28px; font-weight: 700; text-shadow: 0 1px 0 rgba(255,255,255,0.35);&quot;&gt;MxExport V2&lt;/h1&gt;
+    &lt;p style=&quot;color: rgba(11,31,51,0.85); margin: 6px 0 0 0; font-size: 13px; font-weight: 500; text-shadow: 0 1px 0 rgba(255,255,255,0.25);&quot;&gt;Geographic Data Swiss Army Knife&lt;/p&gt;
+&lt;/div&gt;</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="feature_title">
+              <property name="text">
+               <string>&lt;h3 style=&quot;color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;&quot;&gt;Key Features&lt;/h3&gt;</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="feature_list">
+              <property name="text">
+               <string>&lt;ul style=&quot;color: #34495e; line-height: 1.6; margin-left: -15px;&quot;&gt;
+    &lt;li&gt;&lt;b&gt;Multi-Format Import:&lt;/b&gt; Smart parsing of mixed WKT and GeoJSON (including multi-line formats).&lt;/li&gt;
+    &lt;li&gt;&lt;b&gt;Auto-Layering:&lt;/b&gt; Automatically creates separate memory layers for Points, Lines, and Polygons.&lt;/li&gt;
+    &lt;li&gt;&lt;b&gt;Coordinate Hub:&lt;/b&gt; Seamless conversion between WGS84 and Web Mercator with one-click jump.&lt;/li&gt;
+    &lt;li&gt;&lt;b&gt;Tile Utilities:&lt;/b&gt; Visualize NDS TileID and XYZ Tile boundaries for map development.&lt;/li&gt;
+    &lt;li&gt;&lt;b&gt;Data Beautifier:&lt;/b&gt; Automatic JSON formatting and WKT standardization after processing.&lt;/li&gt;
+&lt;/ul&gt;</string>
+              </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="aboutSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="footer_label">
+              <property name="text">
+               <string notr="true">&lt;div style=&quot;background-color: #f8f9fa; border-radius: 8px; padding: 15px; border: 1px solid #e9ecef;&quot;&gt;
+    &lt;table width=&quot;100%&quot; cellpadding=&quot;2&quot;&gt;
+        &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Developer:&lt;/td&gt;&lt;td style=&quot;color: #2c3e50; font-weight: bold; font-size: 12px;&quot;&gt;DAKANG&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Email:&lt;/td&gt;&lt;td&gt;&lt;a href=&quot;mailto:yujikang@mxnavi.com&quot; style=&quot;color: #3498db; text-decoration: none; font-size: 12px;&quot;&gt;yujikang@mxnavi.com&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Version:&lt;/td&gt;&lt;td style=&quot;color: #95a5a6; font-size: 12px;&quot;&gt;2.4.0 (Feb 2026)&lt;/td&gt;&lt;/tr&gt;
+    &lt;/table&gt;
+&lt;/div&gt;</string>
+              </property>
+              <property name="openExternalLinks">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>

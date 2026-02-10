@@ -13,6 +13,7 @@ import re
 from hmac import new
 
 from qgis.core import (
+    Qgis,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsFeature,
@@ -64,6 +65,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.crosshair_visible = True
         self.tile_boundary_visible = False
         self.gcj_02_flag = True
+        self._is_jumping = False  # 增加跳转标志位，防止覆盖用户输入内容
 
         # 设置UI
         self.setupUi(self)
@@ -296,7 +298,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         try:
             canvas = iface.mapCanvas()
             if self.crosshair is None:
-                self.crosshair = CrosshairOverlay(canvas)
+                self.crosshair = CrosshairOverlay(canvas, self)
                 self.crosshair.show_crosshair_display()
                 self.crosshair_visible = True
                 self.update_button_texts()
@@ -331,20 +333,31 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def setup_map_center_tracking(self):
         """设置地图中心变化监听"""
         canvas = iface.mapCanvas()
+        # extentsChanged 仅在停止移动后触发
         canvas.extentsChanged.connect(self.on_map_extent_changed)
+        # mapCanvasRefreshed 在地图移动、缩放过程中持续触发，实现实时更新
+        canvas.mapCanvasRefreshed.connect(self.on_map_refreshed)
+
+    def on_map_refreshed(self):
+        """地图刷新时实时更新（用于平移过程中的实时效果）"""
+        # 实时更新中心点信息，传参表示当前是“预览”模式
+        self.update_center_info(is_preview=True)
+        # 实时更新瓦片边界
+        if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
+            self.update_tile_boundary()
 
     def on_map_extent_changed(self):
         """地图范围改变时更新tile边界和中心信息"""
-        self.update_center_info()
+        self.update_center_info(is_preview=False)
         self.update_coord_input_placeholder()
         if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
             self.update_tile_boundary()
 
     def on_tile_settings_changed(self):
         """tile设置改变时更新显示"""
+        self.update_center_info()
         if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
             self.update_tile_boundary()
-        self.update_center_info()
 
     def on_coord_type_changed(self):
         """坐标系类型改变时更新显示"""
@@ -357,7 +370,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             coord_type = self.coord_type_combo.currentText()
 
             if "NDS TileID" in coord_type:
-                # 获取当前屏幕中心的 NDS TileID
+                # Get current NDS TileID of screen center
                 wgs84_point = self.get_center_point('EPSG:4326')
                 tile_level = int(self.level_combo.currentText())
                 tile_id = encode_tile_id(wgs84_point.x(), wgs84_point.y(), tile_level, is_wgs84=True)
@@ -365,21 +378,21 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 self.x_y_label.setText(self.tr("NDS TileID:"))
 
             elif "XYZ Tile" in coord_type:
-                # 获取当前屏幕中心的 XYZ Tile 坐标
+                # Get current XYZ Tile coordinates of screen center
                 wgs84_point = self.get_center_point('EPSG:4326')
-                z = 14  # 默认 level 为 14
+                z = 14  # Default level 14
                 x, y = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), z)
-                self.x_y_coord_edit.setText(f"{x},{y},{z}")
-                self.x_y_label.setText(self.tr("X, Y, Z (Level):"))
+                self.x_y_coord_edit.setText(f"{z},{x},{y}")
+                self.x_y_label.setText(self.tr("Z, X, Y:"))
 
             elif "WGS84" in coord_type:
-                # 获取 WGS84 坐标
+                # Get WGS84 coordinates
                 point = self.get_center_point('EPSG:4326')
                 self.x_y_coord_edit.setText(f"{point.x():.6f},{point.y():.6f}")
                 self.x_y_label.setText(self.tr("Longitude, Latitude:"))
 
             elif "3857" in coord_type:
-                # 获取 EPSG:3857 坐标
+                # Get EPSG:3857 coordinates
                 point = self.get_center_point('EPSG:3857')
                 self.x_y_coord_edit.setText(f"{point.x():.2f},{point.y():.2f}")
                 self.x_y_label.setText(self.tr("X, Y (EPSG:3857):"))
@@ -389,40 +402,103 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def on_tile_type_settings_changed(self):
         """tile类型设置改变时更新显示"""
-        if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
-            # 获取tile类型和级别
-            tile_type_text = self.tile_type_combo.currentText()
-            level = int(self.level_combo.currentText())
-            if tile_type_text == "NDS" and level > 2:
-                self.level_combo.setCurrentText(str(level - 1))
-            elif level < 19:
-                self.level_combo.setCurrentText(str(level + 1))
-            self.update_tile_boundary()
-        self.update_center_info()
+        tile_type_text = self.tile_type_combo.currentText()
+        level_str = self.level_combo.currentText()
 
-    def update_center_info(self):
-        """更新屏幕中心位置信息"""
+        if level_str:
+            level = int(level_str)
+            if tile_type_text == "NDS" and level > 13:
+                self.level_combo.setCurrentText("13")
+
+        self.update_center_info()
+        if hasattr(self, 'crosshair') and self.crosshair and self.crosshair.show_tile_boundary:
+            self.update_tile_boundary()
+
+    def get_dynamic_precision(self, crs_code):
+        """根据当前地图分辨率计算动态显示精度"""
+        canvas = iface.mapCanvas()
+
+        # 1. 获取当前画布的分辨率（单位取决于画布 CRS，通常是米或度）
+        mup = canvas.mapUnitsPerPixel()
+
+        # 2. 如果显示的是 WGS84 但画布是 3857 (米)，需要将分辨率换算成度
+        # 粗略换算：1度 ≈ 111319.5米
+        if "4326" in crs_code:
+            canvas_crs = canvas.mapSettings().destinationCrs().authid()
+            if "3857" in canvas_crs or "900913" in canvas_crs:
+                mup = mup / 111319.5
+
+        if not mup or mup <= 0:
+            return 6 if "4326" in crs_code else 2
+
+        import math
+
+        try:
+            # 精度计算逻辑：取分辨率的负对数并向上取整
+            # 例如：mup = 0.00001 -> precision = 5
+            precision = math.ceil(-math.log10(mup))
+        except (ValueError, OverflowError):
+            precision = 6
+
+        if "4326" in crs_code:
+            # WGS84(4326)：确保在缩放时精度有变化，且范围在 4..8
+            # 额外 +1 是为了比当前像素分辨率更精确一点
+            return max(4, min(8, precision + 1))
+        elif "3857" in crs_code:
+            # 3857 (米)：范围在 0..3
+            return max(0, min(3, precision))
+
+        return precision
+
+    def update_center_info(self, is_preview=False):
+        """更新屏幕中心位置信息
+
+        Args:
+            is_preview (bool): 是否为预览模式。预览模式下（拖动中）不更新输入框，减少抖动。
+        """
         try:
             # 获取屏幕中心坐标（根据UI选择的坐标系）
             center_point = self.get_center_point()
 
             # 确定坐标系类型
             coord_type = self.coord_type_combo.currentText()
-            is_mercator = "3857" in coord_type
 
-            # 更新坐标输入框
-            if is_mercator:
-                # 3857坐标系使用较少的小数位数
-                self.x_y_coord_edit.setText(f"{center_point.x():.2f}, {center_point.y():.2f}")
-                # 更新坐标显示标签
-                coord_text = self.tr("X, Y (EPSG:3857): {0:.2f}, {1:.2f}").format(center_point.x(), center_point.y())
+            # 1) 第一行“屏幕中心位置”回显：仅根据 4326/3857 显示经纬度或墨卡托
+            is_mercator_system = "3857" in coord_type
+            if is_mercator_system:
+                p_3857 = self.get_center_point('EPSG:3857')
+                prec = self.get_dynamic_precision('EPSG:3857')
+                coord_text = self.tr("X, Y (EPSG:3857): {0:.{2}f}, {1:.{2}f}").format(p_3857.x(), p_3857.y(), prec)
             else:
-                # WGS84坐标系使用更多小数位数
-                self.x_y_coord_edit.setText(f"{center_point.x():.6f}, {center_point.y():.6f}")
-                # 更新坐标显示标签
-                coord_text = self.tr("Longitude, Latitude: {0:.6f}, {1:.6f}").format(center_point.x(), center_point.y())
-
+                p_4326 = self.get_center_point('EPSG:4326')
+                prec = self.get_dynamic_precision('EPSG:4326')
+                coord_text = self.tr("Longitude, Latitude: {0:.{2}f}, {1:.{2}f}").format(p_4326.x(), p_4326.y(), prec)
             self.current_coord_label.setText(coord_text)
+
+            # 2) 输入框回显：
+            # 只有在非预览模式（停止拖动后）、非跳转中、且输入框没有焦点时才更新，彻底消除拖动时的跳变
+            if not is_preview and not self._is_jumping and not self.x_y_coord_edit.hasFocus():
+                if "NDS TileID" in coord_type:
+                    wgs84_point = self.get_center_point('EPSG:4326')
+                    tile_level = int(self.level_combo.currentText())
+                    tile_id = encode_tile_id(wgs84_point.x(), wgs84_point.y(), tile_level, is_wgs84=True)
+                    self.x_y_coord_edit.setText(str(tile_id))
+
+                elif "XYZ Tile" in coord_type:
+                    wgs84_point = self.get_center_point('EPSG:4326')
+                    z = int(self.level_combo.currentText())
+                    x, y = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), z)
+                    self.x_y_coord_edit.setText(f"{z},{x},{y}")
+
+                elif is_mercator_system:
+                    p_3857 = self.get_center_point('EPSG:3857')
+                    prec = self.get_dynamic_precision('EPSG:3857')
+                    self.x_y_coord_edit.setText(f"{p_3857.x():.{prec}f}, {p_3857.y():.{prec}f}")
+
+                else:
+                    p_4326 = self.get_center_point('EPSG:4326')
+                    prec = self.get_dynamic_precision('EPSG:4326')
+                    self.x_y_coord_edit.setText(f"{p_4326.x():.{prec}f}, {p_4326.y():.{prec}f}")
 
             # 计算并显示瓦片信息（始终使用WGS84坐标进行瓦片计算）
             wgs84_point = self.get_center_point('EPSG:4326')
@@ -585,17 +661,21 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
             # 处理 XYZ Tile
             elif "XYZ Tile" in coord_type:
-                x_y_arr = x_y_text.split(',')
+                # 使用正则支持多种分隔符：逗号、空格、斜杠、竖线等
+                x_y_arr = re.split(r'[,\s/|]+', x_y_text)
+                x_y_arr = [item for item in x_y_arr if item]  # 过滤空字符串
+
                 if len(x_y_arr) < 3:
-                    QMessageBox.warning(self, self.tr("Error"), self.tr("Please enter X, Y, Z coordinates"))
+                    QMessageBox.warning(self, self.tr("Error"), self.tr("Please enter Z, X, Y coordinates"))
                     return
 
                 try:
-                    x = int(x_y_arr[0].strip())
-                    y = int(x_y_arr[1].strip())
-                    z = int(x_y_arr[2].strip())
+                    # 调整顺序为 Z, X, Y
+                    z = int(x_y_arr[0].strip())
+                    x = int(x_y_arr[1].strip())
+                    y = int(x_y_arr[2].strip())
                 except ValueError:
-                    QMessageBox.warning(self, self.tr("Error"), self.tr("X, Y and Z must be integers"))
+                    QMessageBox.warning(self, self.tr("Error"), self.tr("Z, X and Y must be integers"))
                     return
 
                 try:
@@ -605,7 +685,10 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     return
             else:
                 # 处理经纬度坐标
-                x_y_arr = x_y_text.split(',')
+                # 使用正则支持多种分隔符：逗号、空格、斜杠、竖线等
+                x_y_arr = re.split(r'[,\s/|]+', x_y_text)
+                x_y_arr = [item for item in x_y_arr if item]  # 过滤空字符串
+
                 if len(x_y_arr) < 2:
                     QMessageBox.warning(self, self.tr("Warning"), self.tr("Please enter complete X and Y coordinates"))
                     return
@@ -751,40 +834,14 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def update_tile_boundary(self):
         """更新tile边界显示"""
         try:
-            # 始终使用WGS84坐标进行瓦片边界计算
-            wgs84_point = self.get_center_point('EPSG:4326')
-            tile_type_text = self.tile_type_combo.currentText()
-            level = int(self.level_combo.currentText())
-
-            # 获取当前canvas的坐标系，用于确定polygon的坐标系
-            canvas = iface.mapCanvas()
-            canvas_crs = canvas.mapSettings().destinationCrs()
-            canvas_crs_code = canvas_crs.authid()
-
-            if tile_type_text == "NDS":
-                if level > 13:
-                    QMessageBox.warning(self, self.tr("Warning"), self.tr("NDS Tile level cannot exceed 13"))
-                    self.level_combo.setCurrentText("13")
-                    level = 13
-                tile_id = encode_tile_id(wgs84_point.x(), wgs84_point.y(), level, is_wgs84=True)
-                polygon = get_tile_bounds_polygon(tile_id, tile_type=CoordinatesSystemType.NDS)
-            else:  # XYZ
-                mx, my = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), level)
-                polygon = get_x_y_bounds_polygon(mx, my, level, tile_type=CoordinatesSystemType.XYZ)
-
-            # 如果是3857坐标系，则将polygon转成魔卡托坐标polygon
-            if canvas_crs_code == "EPSG:3857":
-                new_polygon_arr = []
-                for x, y in polygon:  # polygon 现在是坐标列表
-                    x, y = lonlat_to_mercator(x, y)
-                    new_polygon_arr.append((x, y))
-                polygon = new_polygon_arr
-
             if hasattr(self, 'crosshair') and self.crosshair:
-                self.crosshair.set_tile_boundary(polygon)
+                # 1. 强制重绘覆盖层
+                self.crosshair.update()
+                # 2. 强制画布视口更新，这会立即触发 paintEvent 而不需要移动地图
+                iface.mapCanvas().viewport().update()
 
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error updating tile boundary: {0}").format(str(e)))
+            QgsMessageLog.logMessage(f"Error updating tile boundary: {str(e)}", "MxExport", Qgis.Critical)
 
     def on_template_changed(self, template_name):
         """模板改变时的处理"""
@@ -853,7 +910,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         return geom
 
     def process_wkt_geojson(self):
-        """处理WKT/GeoJSON数据"""
+        """处理WKT/GeoJSON数据，采用先解析后显示的思路，支持跨行GeoJSON"""
         input_text = self.wkt_text_edit.toPlainText().strip()
         layer_name = self.layer_name_edit.text().strip() or "mx"
 
@@ -866,385 +923,249 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             QMessageBox.warning(self, self.tr("Warning"), self.tr("Please enter WKT or GeoJSON data"))
             return
 
-        try:
-            # 处理引号
-            if input_text.startswith(('\'', '"')) and input_text.endswith(('\'', '"')):
-                input_text = input_text[1:-1]
+        # 1. 解析阶段：提取所有几何体和属性
+        parsed_items = []  # 存储格式: (QgsGeometry, properties_dict)
+        formatted_segments = []  # 存储格式化后的文本片段
+        import re
 
-            # 判断是WKT还是GeoJSON
-            if input_text.startswith(('{', '[')):
-                geojson_data = json.loads(input_text)
+        # 提取所有的 JSON 块 (通过查找匹配的 {} )
+        def extract_json_blocks(text):
+            blocks = []
+            stack = 0
+            start = -1
+            for i, char in enumerate(text):
+                if char == '{':
+                    if stack == 0:
+                        start = i
+                    stack += 1
+                elif char == '}':
+                    stack -= 1
+                    if stack == 0 and start != -1:
+                        blocks.append((start, i + 1))
+            return blocks
 
-                # 处理数组格式（可能是 FeatureCollection 的简化形式）
-                if isinstance(geojson_data, list):
-                    geojson_data = {"type": "FeatureCollection", "features": geojson_data}
+        json_indices = extract_json_blocks(input_text)
+        last_end = 0
+        segments = []
+        for start, end in json_indices:
+            if start > last_end:
+                segments.append(('wkt', input_text[last_end:start]))
+            segments.append(('json', input_text[start:end]))
+            last_end = end
+        if last_end < len(input_text):
+            segments.append(('wkt', input_text[last_end:]))
 
-                # 检查 GeoJSON 类型
-                if not isinstance(geojson_data, dict) or 'type' not in geojson_data:
-                    QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid GeoJSON format"))
-                    return
+        for seg_type, content in segments:
+            content = content.strip()
+            if not content:
+                continue
+            try:
+                if seg_type == 'json':
+                    data = json.loads(content)
+                    # 格式化 JSON
+                    formatted_segments.append(json.dumps(data, indent=2, ensure_ascii=False))
 
-                geojson_type = geojson_data['type']
-
-                if geojson_type == 'FeatureCollection':
-                    # FeatureCollection - 创建一个图层，包含多个要素
-                    self.process_geojson_collection(geojson_data, layer_name)
-                    return
-                elif geojson_type == 'Feature':
-                    # Feature 对象 - 提取 geometry 并处理
-                    if 'geometry' not in geojson_data:
-                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON Feature missing geometry"))
-                        return
-                    geom = self.create_geometry_from_geojson(geojson_data['geometry'])
-                    if geom is None or geom.isNull() or geom.isEmpty():
-                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON geometry is empty"))
-                        return
-                    input_text = geom.asWkt()
-                elif geojson_type in [
-                    'Point',
-                    'LineString',
-                    'Polygon',
-                    'MultiPoint',
-                    'MultiLineString',
-                    'MultiPolygon',
-                    'GeometryCollection',
-                ]:
-                    # 纯 Geometry 对象 - 直接处理
-                    geom = self.create_geometry_from_geojson(geojson_data)
-                    if geom is None or geom.isNull() or geom.isEmpty():
-                        QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON geometry is empty"))
-                        return
-                    input_text = geom.asWkt()
+                    temp_features = []
+                    if isinstance(data, list):
+                        temp_features = data
+                    elif isinstance(data, dict):
+                        if data.get('type') == 'FeatureCollection':
+                            temp_features = data.get('features', [])
+                        elif data.get('type') == 'Feature':
+                            temp_features = [data]
+                        elif 'type' in data:
+                            temp_features = [{"type": "Feature", "geometry": data, "properties": {}}]
+                    for feat in temp_features:
+                        geom_data = feat.get('geometry')
+                        props = feat.get('properties', {})
+                        if geom_data:
+                            geom = self.create_geometry_from_geojson(geom_data)
+                            if geom and not geom.isNull():
+                                parsed_items.append((geom, props))
                 else:
-                    QMessageBox.warning(
-                        self, self.tr("Warning"), self.tr("Unsupported GeoJSON type: {0}").format(geojson_type)
-                    )
-                    return
-            else:
-                # 验证WKT格式
-                if QgsGeometry.fromWkt(input_text).isNull():
-                    QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid WKT format"))
-                    return
-
-            self.process_wkt(input_text, layer_name)
-
-        except json.JSONDecodeError as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Invalid JSON format: {0}").format(str(e)))
-            QgsMessageLog.logMessage(f"JSON decode error: {str(e)}", "MxExport Plugin", QgsMessageLog.CRITICAL)
-        except Exception as e:
-            error_msg = str(e)
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error processing data: {0}").format(error_msg))
-            QgsMessageLog.logMessage(
-                f"Error processing WKT/GeoJSON: {error_msg}\nInput: {input_text[:200]}",
-                "MxExport Plugin",
-                QgsMessageLog.CRITICAL,
-            )
-
-    def process_geojson_collection(self, geojson_data, layer_name):
-        """处理 GeoJSON FeatureCollection - 创建一个图层包含多个要素"""
-        try:
-            # 处理不同的输入格式
-            if isinstance(geojson_data, list):
-                # 如果是列表，假设是 features 列表
-                features = geojson_data
-            elif isinstance(geojson_data, dict):
-                if geojson_data.get('type') == 'FeatureCollection':
-                    features = geojson_data.get("features", [])
-                elif geojson_data.get('type') == 'Feature':
-                    # 单个 Feature，转换为列表
-                    features = [geojson_data]
-                else:
-                    # 可能是纯 Geometry，转换为 Feature
-                    features = [{"type": "Feature", "geometry": geojson_data, "properties": {}}]
-            else:
-                QMessageBox.warning(self, self.tr("Warning"), self.tr("Invalid GeoJSON format"))
-                return
-
-            if not features:
-                QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty"))
-                return
-
-            QgsMessageLog.logMessage(f"Processing {len(features)} features", "MxExport Plugin")
-
-            # 提取所有几何体、properties并确定最合适的图层类型
-            geoms_and_props = []
-            geom_types = set()
-            all_properties_keys = set()
-
-            for idx, feature in enumerate(features):
-                QgsMessageLog.logMessage(f"Processing feature {idx}: {json.dumps(feature)[:200]}", "MxExport Plugin")
-                try:
-                    # 处理不同的 feature 格式
-                    if isinstance(feature, dict):
-                        if feature.get('type') == 'Feature':
-                            geometry_data = feature.get("geometry")
-                        elif 'type' in feature and feature['type'] in [
-                            'Point',
-                            'LineString',
-                            'Polygon',
-                            'MultiPoint',
-                            'MultiLineString',
-                            'MultiPolygon',
-                        ]:
-                            # 纯 Geometry 对象
-                            geometry_data = feature
-                        else:
-                            QgsMessageLog.logMessage(f"Warning: Unknown feature format: {feature}", "MxExport Plugin")
-                            continue
+                    wkt_patterns = r'(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\s*\(.*?\)'
+                    matches = list(re.finditer(wkt_patterns, content, re.IGNORECASE | re.DOTALL))
+                    if matches:
+                        for match in matches:
+                            wkt_str = match.group(0)
+                            geom = QgsGeometry.fromWkt(wkt_str)
+                            if geom and not geom.isNull():
+                                parsed_items.append((geom, {"source": "WKT"}))
+                                # 格式化 WKT：压缩多余空白并转为大写
+                                formatted_wkt = re.sub(r'\s+', ' ', wkt_str).strip().upper()
+                                formatted_segments.append(formatted_wkt)
                     else:
-                        QgsMessageLog.logMessage(f"Warning: Feature is not a dict: {type(feature)}", "MxExport Plugin")
-                        continue
+                        for line in content.split('\n'):
+                            line = line.strip()
+                            if not line:
+                                continue
+                            geom = QgsGeometry.fromWkt(line)
+                            if geom and not geom.isNull():
+                                parsed_items.append((geom, {"source": "WKT"}))
+                                formatted_segments.append(line.upper())
+            except Exception as e:
+                QgsMessageLog.logMessage(f"Segment parse error: {str(e)}", "MxExport", Qgis.Warning)
+                formatted_segments.append(content)  # 出错则保留原样
 
-                    if geometry_data is None:
-                        QgsMessageLog.logMessage("Warning: Feature missing geometry", "MxExport Plugin")
-                        continue
+        # 将格式化后的内容写回输入框
+        if formatted_segments:
+            self.wkt_text_edit.setPlainText("\n\n".join(formatted_segments))
 
-                    # 使用统一的辅助函数创建几何体
-                    geom_json = json.dumps(geometry_data)
-                    QgsMessageLog.logMessage(f"Geometry JSON: {geom_json[:200]}", "MxExport Plugin")
+        if not parsed_items:
+            QMessageBox.warning(self, self.tr("Warning"), self.tr("No valid geometry data found"))
+            return
 
-                    geom = self.create_geometry_from_geojson(geometry_data)
+        # 2. 渲染阶段：分类渲染
+        self.render_items_to_layer(parsed_items, layer_name)
 
-                    if geom is None:
-                        geom = QgsGeometry()  # 创建空几何体
+    def render_items_to_layer(self, parsed_items, layer_name):
+        """将统一格式的 parsed_items (geom, props) 分类渲染到不同的图层中"""
+        try:
+            # 1. 按几何类型分组
+            groups = {'Point': [], 'LineString': [], 'Polygon': []}
 
-                    geom_type = geometry_data.get('type', 'Unknown')
-                    QgsMessageLog.logMessage(
-                        f"Geometry created: type={geom_type}, isNull={geom.isNull()}, isEmpty={geom.isEmpty()}, wkbType={geom.wkbType()}",
-                        "MxExport Plugin",
-                    )
+            for geom, props in parsed_items:
+                g_type = QgsWkbTypes.displayString(geom.wkbType())
+                if 'Point' in g_type:
+                    groups['Point'].append((geom, props))
+                elif 'Line' in g_type:
+                    groups['LineString'].append((geom, props))
+                elif 'Polygon' in g_type:
+                    groups['Polygon'].append((geom, props))
+                else:
+                    # 默认归类为线（或者你可以根据需要添加更多类型）
+                    groups['LineString'].append((geom, props))
 
-                    if geom.isNull():
-                        QgsMessageLog.logMessage(
-                            f"Warning: Geometry is null for feature: {json.dumps(feature)[:100]}", "MxExport Plugin"
-                        )
-                        continue
+            canvas = iface.mapCanvas()
+            dest_crs = canvas.mapSettings().destinationCrs()
+            canvas_crs_code = dest_crs.authid() or 'EPSG:4326'
 
-                    if geom.isEmpty():
-                        QgsMessageLog.logMessage(
-                            f"Warning: Geometry is empty for feature: {json.dumps(feature)[:100]}", "MxExport Plugin"
-                        )
-                        continue
+            created_layers = []
 
-                    if True:  # 改为始终处理非空几何
-                        # 获取properties
-                        if isinstance(feature, dict) and 'properties' in feature:
-                            props = feature.get("properties", {})
-                        else:
-                            props = {}
-                        if props:
-                            all_properties_keys.update(props.keys())
-                        # 获取几何类型名称
-                        geom_type_name = QgsWkbTypes.displayString(geom.wkbType())
-                        # 转换为简化的类型名称
-                        if 'Point' in geom_type_name:
-                            geom_type_simple = 'Point'
-                        elif 'Line' in geom_type_name:
-                            geom_type_simple = 'LineString'
-                        elif 'Polygon' in geom_type_name:
-                            geom_type_simple = 'Polygon'
-                        else:
-                            geom_type_simple = geom_type_name
-                        geoms_and_props.append((geom, props))
-                        geom_types.add(geom_type_simple)
-                except Exception as e:
-                    QgsMessageLog.logMessage(f"Warning: Failed to parse feature geometry: {str(e)}", "MxExport Plugin")
+            # 2. 为每个非空组创建图层
+            for g_type, items in groups.items():
+                if not items:
                     continue
 
-            if not geoms_and_props:
-                error_msg = (
-                    f"No valid geometries found. Processed {len(features)} features. Check QGIS log for details."
-                )
-                QMessageBox.warning(self, self.tr("Warning"), self.tr("GeoJSON data is empty") + f"\n{error_msg}")
-                QgsMessageLog.logMessage(error_msg, "MxExport Plugin", QgsMessageLog.WARNING)
+                suffix = ""
+                if g_type == 'Point':
+                    suffix = "_pt"
+                elif g_type == 'LineString':
+                    suffix = "_ln"
+                elif g_type == 'Polygon':
+                    suffix = "_pg"
+
+                specific_layer_name = f"{layer_name}{suffix}"
+                layer = self.create_single_type_layer(items, g_type, specific_layer_name, dest_crs)
+
+                if layer:
+                    created_layers.append(layer)
+
+            if not created_layers:
                 return
 
-            QgsMessageLog.logMessage(f"Successfully parsed {len(geoms_and_props)} geometries", "MxExport Plugin")
+            # 3. 缩放至总范围
+            if self.zoom_layer_checkbox.isChecked():
+                total_extent = QgsRectangle()
+                total_extent.setMinimal()
 
-            # 确定图层类型（如果有多种类型，使用 Geometry）
-            if len(geom_types) == 1:
-                geom_type_name = list(geom_types)[0]
-                if geom_type_name == 'Point':
-                    layer_type = "Point"
-                elif geom_type_name in ('LineString', 'MultiLineString'):
-                    layer_type = "LineString"
-                elif geom_type_name in ('Polygon', 'MultiPolygon'):
-                    layer_type = "Polygon"
-                else:
-                    layer_type = "Geometry"
-            else:
-                layer_type = "Geometry"
+                valid_extent = False
+                for layer in created_layers:
+                    # 确保图层范围是最新的
+                    layer.updateExtents()
+                    extent = layer.extent()
+                    if not extent.isEmpty():
+                        total_extent.combineExtentWith(extent)
+                        valid_extent = True
 
-            if self.create_layer_checkbox.isChecked():
-                # 获取当前地图画布的坐标系
-                canvas = iface.mapCanvas()
-                canvas_crs = canvas.mapSettings().destinationCrs()
-                canvas_crs_code = canvas_crs.authid() or 'EPSG:4326'
-
-                # 创建图层，使用与画布相同的坐标系
-                layer = QgsVectorLayer(f"{layer_type}?crs={canvas_crs_code}", layer_name, "memory")
-                provider = layer.dataProvider()
-
-                # 为图层添加属性字段
-                fields = []
-                for key in sorted(all_properties_keys):
-                    fields.append(QgsField(key, QVariant.String))
-
-                if fields:
-                    provider.addAttributes(fields)
-                    layer.updateFields()
-
-                # 添加要素
-                features_list = []
-                source_crs = QgsCoordinateReferenceSystem('EPSG:4326')
-
-                for geom, props in geoms_and_props:
-                    # geom 已经是 QgsGeometry 对象，直接使用
-                    qgs_geom = geom
-
-                    # 如果画布坐标系与源坐标系不同，进行转换
-                    if canvas_crs_code != 'EPSG:4326':
-                        transform = QgsCoordinateTransform(source_crs, canvas_crs, QgsProject.instance())
-                        qgs_geom.transform(transform)
-
-                    feature = QgsFeature()
-                    feature.setGeometry(qgs_geom)
-
-                    # 设置属性值
-                    if props and fields:
-                        attributes = []
-                        for key in sorted(all_properties_keys):
-                            attributes.append(props.get(key, ''))
-                        feature.setAttributes(attributes)
-
-                    features_list.append(feature)
-
-                # 添加所有要素到图层
-                provider.addFeatures(features_list)
-                layer.updateExtents()
-
-                # 根据几何类型设置符号样式（使用随机颜色和更细的线条）
-                random_color = self.generate_random_color()
-
-                if layer_type == "Point":
-                    symbol_properties = {
-                        'name': 'circle',
-                        'size': '3',  # 从 5 改为 3，更小
-                        'color': random_color,
-                        'outline_color': '#FFFFFF',
-                        'outline_width': '0.3',  # 从 0.5 改为 0.3，更细
-                    }
-                    symbol = QgsMarkerSymbol.createSimple(symbol_properties)
-                elif layer_type == "LineString":
-                    symbol = QgsLineSymbol.createSimple(
-                        {'line_color': random_color, 'line_width': '0.5'}
-                    )  # 从 1 改为 0.5
-                elif layer_type == "Polygon":
-                    # 多边形填充色使用半透明
-                    fill_color = random_color + '40'  # 添加透明度
-                    symbol = QgsFillSymbol.createSimple(
-                        {'color': fill_color, 'outline_color': random_color, 'outline_width': '0.5'}
-                    )
-                else:
-                    symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
-
-                renderer = QgsSingleSymbolRenderer(symbol)
-                layer.setRenderer(renderer)
-
-                # 添加到项目
-                QgsProject.instance().addMapLayer(layer)
-
-                if self.zoom_layer_checkbox.isChecked():
-                    canvas.setExtent(layer.extent())
+                if valid_extent and not total_extent.isEmpty():
+                    # 稍微扩大一点范围，避免几何体紧贴边缘
+                    total_extent.scale(1.1)
+                    canvas.setExtent(total_extent)
                     canvas.refresh()
 
-            QMessageBox.information(
-                self,
-                self.tr("Success"),
-                self.tr("GeoJSON data processed successfully and layer created: {0}").format(layer_name),
-            )
+            QMessageBox.information(self, self.tr("Success"), self.tr("Created {0} layers").format(len(created_layers)))
 
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Error"), self.tr("Error processing GeoJSON data: {0}").format(str(e)))
+            QgsMessageLog.logMessage(f"Render error: {str(e)}", "MxExport", Qgis.Critical)
+            QMessageBox.critical(self, self.tr("Error"), f"Render error: {str(e)}")
 
-    def process_wkt(self, wkt_text, layer_name):
-        """处理WKT数据"""
-        geometry = QgsGeometry.fromWkt(wkt_text)
-        if geometry.isNull():
-            raise Exception(self.tr("Invalid WKT format"))
+    def create_single_type_layer(self, items, layer_type, layer_name, dest_crs):
+        """为特定类型的数据创建图层"""
+        try:
+            uri = f"{layer_type}?crs={dest_crs.authid() or 'EPSG:4326'}&index=yes"
+            layer = QgsVectorLayer(uri, layer_name, "memory")
 
-        # 根据几何类型确定图层类型
-        geom_type = geometry.wkbType()
-        if QgsWkbTypes.geometryType(geom_type) == QgsWkbTypes.PointGeometry:
-            layer_type = "Point"
-        elif QgsWkbTypes.geometryType(geom_type) == QgsWkbTypes.LineGeometry:
-            layer_type = "LineString"
-        elif QgsWkbTypes.geometryType(geom_type) == QgsWkbTypes.PolygonGeometry:
-            layer_type = "Polygon"
-        else:
-            layer_type = "Geometry"
+            if not layer.isValid():
+                return None
 
-        if self.create_layer_checkbox.isChecked():
-            # 获取当前地图画布的坐标系
-            canvas = iface.mapCanvas()
-            canvas_crs = canvas.mapSettings().destinationCrs()
-            canvas_crs_code = canvas_crs.authid() or 'EPSG:4326'
+            provider = layer.dataProvider()
 
-            # WKT通常假设为WGS84坐标
-            source_crs_code = 'EPSG:4326'
+            # 收集属性键
+            all_props_keys = set()
+            for _, props in items:
+                all_props_keys.update(props.keys())
 
-            # 创建图层时使用地图画布的坐标系
-            layer = QgsVectorLayer(f"{layer_type}?crs={canvas_crs_code}", layer_name, "memory")
+            # 添加字段
+            new_fields = []
+            for name in sorted(all_props_keys):
+                new_fields.append(QgsField(name, QVariant.String))
+            provider.addAttributes(new_fields)
+            layer.updateFields()
 
-            feature = QgsFeature()
+            # 转换要素
+            features = []
+            source_crs = QgsCoordinateReferenceSystem('EPSG:4326')
+            do_transform = dest_crs.authid() != 'EPSG:4326'
+            transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance()) if do_transform else None
 
-            # 如果地图画布坐标系与WGT坐标系不同，需要进行坐标转换
-            if canvas_crs_code != source_crs_code:
-                source_crs = QgsCoordinateReferenceSystem(source_crs_code)
-                transform = QgsCoordinateTransform(source_crs, canvas_crs, QgsProject.instance())
-                geometry.transform(transform)
+            for geom, props in items:
+                feat = QgsFeature(layer.fields())
+                new_geom = QgsGeometry(geom)
+                if do_transform:
+                    new_geom.transform(transform)
+                feat.setGeometry(new_geom)
 
-            feature.setGeometry(geometry)
+                if not layer.fields().isEmpty():
+                    attrs = [props.get(field.name(), None) for field in layer.fields()]
+                    feat.setAttributes(attrs)
+                features.append(feat)
 
-            layer.dataProvider().addFeatures([feature])
+            # 写入要素 (内存图层直接通过 provider 写入最快且不会保持编辑状态)
+            provider.addFeatures(features)
             layer.updateExtents()
 
-            # 为 WKT 图层也设置随机颜色和细线条
-            random_color = self.generate_random_color()
+            # 设置样式
+            self.apply_random_style(layer, layer_type)
 
-            if layer_type == "Point":
-                symbol_properties = {
-                    'name': 'circle',
-                    'size': '3',
-                    'color': random_color,
-                    'outline_color': '#FFFFFF',
-                    'outline_width': '0.3',
-                }
-                symbol = QgsMarkerSymbol.createSimple(symbol_properties)
-            elif layer_type == "LineString":
-                symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
-            elif layer_type == "Polygon":
-                fill_color = random_color + '40'  # 半透明填充
-                symbol = QgsFillSymbol.createSimple(
-                    {'color': fill_color, 'outline_color': random_color, 'outline_width': '0.5'}
-                )
-            else:
-                symbol = QgsLineSymbol.createSimple({'line_color': random_color, 'line_width': '0.5'})
-
-            renderer = QgsSingleSymbolRenderer(symbol)
-            layer.setRenderer(renderer)
-
+            # 添加到地图
             QgsProject.instance().addMapLayer(layer)
+            layer.triggerRepaint()
 
-            if self.zoom_layer_checkbox.isChecked():
-                iface.mapCanvas().setExtent(layer.extent())
-                iface.mapCanvas().refresh()
+            return layer
+        except Exception as e:
+            QgsMessageLog.logMessage(f"Failed to create layer {layer_name}: {str(e)}", "MxExport", Qgis.Critical)
+            return None
 
-        QMessageBox.information(
-            self,
-            self.tr("Success"),
-            self.tr("WKT data processed successfully and layer created: {0}").format(layer_name),
-        )
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), f"Render error: {str(e)}")
+
+    def apply_random_style(self, layer, layer_type):
+        """为图层应用随机样式"""
+        color = self.generate_random_color()
+        if "Point" in layer_type:
+            symbol = QgsMarkerSymbol.createSimple(
+                {'name': 'circle', 'size': '3', 'color': color, 'outline_color': '#FFFFFF'}
+            )
+        elif "Line" in layer_type:
+            symbol = QgsLineSymbol.createSimple({'line_color': color, 'line_width': '0.5'})
+        elif "Polygon" in layer_type:
+            symbol = QgsFillSymbol.createSimple({'color': color + '40', 'outline_color': color, 'outline_width': '0.5'})
+        else:
+            symbol = QgsLineSymbol.createSimple({'line_color': color, 'line_width': '0.5'})
+
+        layer.setRenderer(QgsSingleSymbolRenderer(symbol))
+        layer.triggerRepaint()
 
     def get_center_point(self, target_crs_code=None):
         """获取屏幕中心点坐标
@@ -1339,17 +1260,25 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.update_center_info()
 
     def closeEvent(self, event):
-        """关闭事件"""
-        # 清理十字准线
+        """处理窗口关闭事件"""
+        # 隐藏十字准线
         if hasattr(self, 'crosshair') and self.crosshair:
-            self.crosshair.hide()
+            try:
+                self.crosshair.hide()
+                self.crosshair.deleteLater()
+                self.crosshair = None
+            except:
+                pass
 
-        # 断开信号连接
+        # 断开地图范围变化信号
         try:
             canvas = iface.mapCanvas()
             canvas.extentsChanged.disconnect(self.on_map_extent_changed)
+            canvas.mapCanvasRefreshed.disconnect(self.on_map_refreshed)
         except:
+            # 忽略信号未连接或 canvas 已销毁的异常
             pass
 
+        # 发射插件关闭信号给主类
         self.closingPlugin.emit()
         event.accept()

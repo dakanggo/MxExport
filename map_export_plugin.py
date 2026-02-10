@@ -19,16 +19,36 @@ class MapExportPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
+
+        # 初始化翻译
+        locale = QSettings().value('locale/userLocale', 'en_US')[0:2]
+        locale_path = os.path.join(self.plugin_dir, 'i18n', 'MxExport_{}.qm'.format(locale))
+
+        if os.path.exists(locale_path):
+            self.translator = QTranslator()
+            self.translator.load(locale_path)
+            QCoreApplication.installTranslator(self.translator)
+
         self.actions = []
-        self.menu = '地图导出工具'
+        self.menu = QCoreApplication.translate('MapExportPlugin', 'Map Export Tool')
         self.toolbar = self.iface.addToolBar('MapExportPlugin')
         self.toolbar.setObjectName('MapExportPlugin')
 
         self.pluginIsActive = False
         self.dockwidget = None
 
-    def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True,
-                   add_to_toolbar=True, status_tip=None, whats_this=None, parent=None):
+    def add_action(
+        self,
+        icon_path,
+        text,
+        callback,
+        enabled_flag=True,
+        add_to_menu=True,
+        add_to_toolbar=True,
+        status_tip=None,
+        whats_this=None,
+        parent=None,
+    ):
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
@@ -53,27 +73,39 @@ class MapExportPlugin:
         icon_path = os.path.join(self.plugin_dir, 'dakang_icon.png')
         self.add_action(
             icon_path,
-            text='地图导出工具',
+            text=QCoreApplication.translate('MapExportPlugin', 'Map Export Tool'),
             callback=self.run,
-            parent=self.iface.mainWindow())
+            parent=self.iface.mainWindow(),
+        )
 
     def onClosePlugin(self):
-        self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
+        """处理插件关闭时的清理工作"""
+        if self.dockwidget:
+            try:
+                self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
+            except:
+                pass
+        self.dockwidget = None
         self.pluginIsActive = False
 
     def unload(self):
+        """卸载插件"""
+        if self.dockwidget:
+            self.dockwidget.close()
         for action in self.actions:
-            self.iface.removePluginMenu('地图导出工具', action)
+            self.iface.removePluginMenu(QCoreApplication.translate('MapExportPlugin', 'Map Export Tool'), action)
             self.iface.removeToolBarIcon(action)
-        del self.toolbar
+        if self.toolbar:
+            del self.toolbar
 
     def run(self):
+        """运行插件"""
         if not self.pluginIsActive:
             self.pluginIsActive = True
 
             if self.dockwidget is None:
                 self.dockwidget = MapExportDockWidget()
+                self.dockwidget.closingPlugin.connect(self.onClosePlugin)
 
-            self.dockwidget.closingPlugin.connect(self.onClosePlugin)
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
             self.dockwidget.show()
