@@ -8,7 +8,15 @@ from qgis.PyQt import QtCore, QtGui
 from qgis.PyQt.QtCore import Qt, QPointF, QRectF, QCoreApplication
 from qgis.PyQt.QtGui import QPainter, QPen, QColor, QBrush
 from qgis.gui import QgsMapCanvasItem
-from qgis.core import QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsRectangle
+from qgis.core import (
+    Qgis,
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsMessageLog,
+    QgsPointXY,
+    QgsProject,
+    QgsRectangle,
+)
 from .tile_utils import *
 
 
@@ -23,6 +31,7 @@ class CrosshairOverlay(QgsMapCanvasItem):
         # 显示状态
         self.show_crosshair_flag = True
         self.show_tile_boundary_flag = False
+        self._tile_boundary_error = None
         # small: 当前的短十字；full: 横竖线拉满屏幕
         self.crosshair_style = "small"
 
@@ -154,9 +163,17 @@ class CrosshairOverlay(QgsMapCanvasItem):
                     p1 = screen_points[i]
                     p2 = screen_points[(i + 1) % len(screen_points)]
                     painter.drawLine(p1, p2)
-
-        except Exception:
-            pass
+        except Exception as error:
+            message = str(error)
+            if message != self._tile_boundary_error:
+                self._tile_boundary_error = message
+                QgsMessageLog.logMessage(
+                    "Skip tile boundary draw: {}".format(message),
+                    "MxExport",
+                    Qgis.Warning,
+                )
+        else:
+            self._tile_boundary_error = None
 
     def boundingRect(self):
         """返回覆盖范围，必须使用 QRectF"""

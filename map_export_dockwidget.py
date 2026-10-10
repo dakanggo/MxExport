@@ -8,8 +8,8 @@
 
 import json
 import os
-import random
 import re
+import secrets
 from hmac import new
 
 from qgis.core import (
@@ -64,6 +64,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.crosshair = None
         self.crosshair_visible = True
         self.tile_boundary_visible = False
+        self._map_signals_connected = False
         self.gcj_02_flag = True
         self._is_jumping = False  # 增加跳转标志位，防止覆盖用户输入内容
 
@@ -100,16 +101,18 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         return QCoreApplication.translate('MapExportDockWidget', message)
 
     def generate_random_color(self):
-        """生成随机颜色（排除过浅和过深的颜色）"""
-        # 生成 HSV 色彩空间中的颜色，确保颜色鲜艳且可见
+        """生成图层配色。只用于显示，不参与任何安全判断。"""
         import colorsys
 
-        # 色相：0-1 随机
-        hue = random.random()
+        def unit():
+            return secrets.randbits(24) / float(1 << 24)
+
+        # 色相：0-1
+        hue = unit()
         # 饱和度：0.5-0.9 确保颜色鲜艳
-        saturation = random.uniform(0.5, 0.9)
+        saturation = 0.5 + unit() * 0.4
         # 明度：0.4-0.8 避免过深或过浅
-        value = random.uniform(0.4, 0.8)
+        value = 0.4 + unit() * 0.4
 
         # 转换为 RGB
         r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
@@ -380,6 +383,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         canvas.extentsChanged.connect(self.on_map_extent_changed)
         # mapCanvasRefreshed 在地图移动、缩放过程中持续触发，实现实时更新
         canvas.mapCanvasRefreshed.connect(self.on_map_refreshed)
+        self._map_signals_connected = True
 
     def on_map_refreshed(self):
         """地图刷新时实时更新（用于平移过程中的实时效果）"""
@@ -1416,23 +1420,32 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def closeEvent(self, event):
         """处理窗口关闭事件"""
-        # 隐藏十字准线
-        if hasattr(self, 'crosshair') and self.crosshair:
+        # 隐藏十字准线。C++ 对象已销毁时只记日志，避免关闭流程中断。
+        if self.crosshair is not None:
             try:
                 self.crosshair.hide()
                 self.crosshair.deleteLater()
-                self.crosshair = None
-            except:
-                pass
+            except RuntimeError as error:
+                QgsMessageLog.logMessage(
+                    "Crosshair already destroyed: {}".format(error),
+                    "MxExport",
+                    Qgis.Warning,
+                )
+            self.crosshair = None
 
-        # 断开地图范围变化信号
-        try:
-            canvas = iface.mapCanvas()
-            canvas.extentsChanged.disconnect(self.on_map_extent_changed)
-            canvas.mapCanvasRefreshed.disconnect(self.on_map_refreshed)
-        except:
-            # 忽略信号未连接或 canvas 已销毁的异常
-            pass
+        # 只断开本次实际连上的地图信号。画布已销毁时记日志并继续关闭。
+        if self._map_signals_connected:
+            try:
+                canvas = iface.mapCanvas()
+                canvas.extentsChanged.disconnect(self.on_map_extent_changed)
+                canvas.mapCanvasRefreshed.disconnect(self.on_map_refreshed)
+            except RuntimeError as error:
+                QgsMessageLog.logMessage(
+                    "Map signal disconnect skipped: {}".format(error),
+                    "MxExport",
+                    Qgis.Warning,
+                )
+            self._map_signals_connected = False
 
         # 发射插件关闭信号给主类
         self.closingPlugin.emit()

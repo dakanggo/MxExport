@@ -36,6 +36,7 @@ class MapExportPlugin:
 
         self.pluginIsActive = False
         self.dockwidget = None
+        self._closing_connected = False
 
     def add_action(
         self,
@@ -80,11 +81,9 @@ class MapExportPlugin:
 
     def onClosePlugin(self):
         """处理插件关闭时的清理工作"""
-        if self.dockwidget:
-            try:
-                self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
-            except:
-                pass
+        if self.dockwidget is not None and self._closing_connected:
+            self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
+            self._closing_connected = False
         self.dockwidget = None
         self.pluginIsActive = False
 
@@ -106,6 +105,7 @@ class MapExportPlugin:
             if self.dockwidget is None:
                 self.dockwidget = MapExportDockWidget()
                 self.dockwidget.closingPlugin.connect(self.onClosePlugin)
+                self._closing_connected = True
 
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
             self.dockwidget.show()
