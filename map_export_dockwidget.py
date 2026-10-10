@@ -69,6 +69,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # 设置UI
         self.setupUi(self)
+        self.setup_wkt_panel_size()
 
         # 强制重新翻译UI元素
         self.retranslateUi()
@@ -115,6 +116,24 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # 转换为十六进制颜色
         return '#{:02x}{:02x}{:02x}'.format(int(r * 255), int(g * 255), int(b * 255))
+
+    def setup_wkt_panel_size(self):
+        """WKT 页高度跟随面板，输入框吃掉剩余空间，底部按钮始终留在可视区域。"""
+        self.setMinimumWidth(360)
+        self.setMinimumHeight(520)
+
+        editor_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Ignored)
+        editor_policy.setVerticalStretch(1)
+        self.wkt_text_edit.setMinimumHeight(120)
+        self.wkt_text_edit.setSizePolicy(editor_policy)
+
+        group_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        group_policy.setVerticalStretch(1)
+        self.data_group.setSizePolicy(group_policy)
+
+        self.wkt_layout.setStretch(0, 1)
+        self.wkt_layout.setStretch(1, 0)
+        self.wkt_layout.setStretch(2, 0)
 
     def setup_default_values(self):
         """设置默认值"""
@@ -278,6 +297,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # 更新按钮状态文本
         self.update_button_texts()
+        self.update_crosshair_style_items()
 
     def update_button_texts(self):
         """更新按钮文本状态"""
@@ -293,12 +313,34 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         else:
             self.show_tile_boundary_btn.setText(self.tr("Show Tile Boundary"))
 
+    def update_crosshair_style_items(self):
+        """刷新十字准线样式选项，并保持当前选择。"""
+        current = self.crosshair_style_combo.currentData() or "small"
+        self.crosshair_style_combo.blockSignals(True)
+        self.crosshair_style_combo.clear()
+        self.crosshair_style_combo.addItem(self.tr("短十字"), "small")
+        self.crosshair_style_combo.addItem(self.tr("满屏"), "full")
+        index = self.crosshair_style_combo.findData(current)
+        self.crosshair_style_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.crosshair_style_combo.setFixedSize(88, 32)
+        self.crosshair_style_combo.blockSignals(False)
+        self.crosshair_style_combo.setToolTip(self.tr("短十字：屏幕中心的短十字；满屏：横线和竖线拉满屏幕"))
+
+    def on_crosshair_style_changed(self):
+        """切换十字准线样式"""
+        if not self.crosshair:
+            return
+        style = self.crosshair_style_combo.currentData() or "small"
+        self.crosshair.set_crosshair_style(style)
+
     def init_crosshair(self):
         """初始化十字准线（默认显示）"""
         try:
             canvas = iface.mapCanvas()
             if self.crosshair is None:
                 self.crosshair = CrosshairOverlay(canvas, self)
+                style = self.crosshair_style_combo.currentData() or "small"
+                self.crosshair.crosshair_style = style
                 self.crosshair.show_crosshair_display()
                 self.crosshair_visible = True
                 self.update_button_texts()
@@ -317,6 +359,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # 坐标转换相关信号
         self.goto_coord_btn.clicked.connect(self.goto_coordinate)
         self.show_crosshair_btn.clicked.connect(self.toggle_crosshair_display)
+        self.crosshair_style_combo.currentIndexChanged.connect(self.on_crosshair_style_changed)
         self.x_y_coord_edit.returnPressed.connect(self.goto_coordinate)
         self.set_point_btn.clicked.connect(self.set_point_layer)
         self.coord_type_combo.currentTextChanged.connect(self.on_coord_type_changed)
@@ -364,6 +407,24 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.update_center_info()
         self.update_coord_input_placeholder()
 
+    def tile_echo_level(self, tile_type_name):
+        """XYZ / TMS 坐标回显使用的 Z。
+
+        瓦片显示类型与当前坐标格式一致时，跟瓦片等级下拉框对齐；
+        否则使用默认等级 14。
+        """
+        if self.tile_type_combo.currentText() == tile_type_name:
+            level_str = self.level_combo.currentText().strip()
+            if level_str:
+                return int(level_str)
+        return 14
+
+    def slippy_tile_xy(self, lon, lat, level, tile_type_name):
+        """按 XYZ 或 TMS 计算屏幕中心所在瓦片的列、行。"""
+        if tile_type_name == "TMS":
+            return latlon_to_tms(lon, lat, level)
+        return latlon_to_xyz(lon, lat, level)
+
     def update_coord_input_placeholder(self):
         """根据坐标类型更新输入框的值和标签"""
         try:
@@ -377,11 +438,12 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 self.x_y_coord_edit.setText(str(tile_id))
                 self.x_y_label.setText(self.tr("NDS TileID:"))
 
-            elif "XYZ Tile" in coord_type:
-                # Get current XYZ Tile coordinates of screen center
+            elif "XYZ Tile" in coord_type or "TMS Tile" in coord_type:
+                # Get current XYZ / TMS tile coordinates of screen center
                 wgs84_point = self.get_center_point('EPSG:4326')
-                z = 14  # Default level 14
-                x, y = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), z)
+                tile_type_name = "TMS" if "TMS Tile" in coord_type else "XYZ"
+                z = self.tile_echo_level(tile_type_name)
+                x, y = self.slippy_tile_xy(wgs84_point.x(), wgs84_point.y(), z, tile_type_name)
                 self.x_y_coord_edit.setText(f"{z},{x},{y}")
                 self.x_y_label.setText(self.tr("Z, X, Y:"))
 
@@ -484,10 +546,11 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     tile_id = encode_tile_id(wgs84_point.x(), wgs84_point.y(), tile_level, is_wgs84=True)
                     self.x_y_coord_edit.setText(str(tile_id))
 
-                elif "XYZ Tile" in coord_type:
+                elif "XYZ Tile" in coord_type or "TMS Tile" in coord_type:
                     wgs84_point = self.get_center_point('EPSG:4326')
-                    z = int(self.level_combo.currentText())
-                    x, y = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), z)
+                    tile_type_name = "TMS" if "TMS Tile" in coord_type else "XYZ"
+                    z = self.tile_echo_level(tile_type_name)
+                    x, y = self.slippy_tile_xy(wgs84_point.x(), wgs84_point.y(), z, tile_type_name)
                     self.x_y_coord_edit.setText(f"{z},{x},{y}")
 
                 elif is_mercator_system:
@@ -512,12 +575,12 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     level = 13
                 tile_id = encode_tile_id(wgs84_point.x(), wgs84_point.y(), level, is_wgs84=True)
                 x, y = parse_tile_id_2_nds(tile_id)
-            else:  # XYZ
-                x, y = latlon_to_xyz(wgs84_point.x(), wgs84_point.y(), level)
+            else:  # XYZ / TMS
+                x, y = self.slippy_tile_xy(wgs84_point.x(), wgs84_point.y(), level, tile_type_text)
                 tile_id = None
 
             # 构建瓦片信息文本
-            tile_prefix = "NDS" if tile_type_text == "NDS" else "XYZ"
+            tile_prefix = tile_type_text if tile_type_text in ("NDS", "XYZ", "TMS") else "XYZ"
             tile_text = self.tr("{0} Level {1} Tile: ").format(tile_prefix, level)
 
             if tile_id:
@@ -659,8 +722,8 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     QMessageBox.warning(self, self.tr("Error"), str(e))
                     return
 
-            # 处理 XYZ Tile
-            elif "XYZ Tile" in coord_type:
+            # 处理 XYZ / TMS Tile。TMS 与 XYZ 的 X、Z 相同，Y 轴方向相反
+            elif "XYZ Tile" in coord_type or "TMS Tile" in coord_type:
                 # 使用正则支持多种分隔符：逗号、空格、斜杠、竖线等
                 x_y_arr = re.split(r'[,\s/|]+', x_y_text)
                 x_y_arr = [item for item in x_y_arr if item]  # 过滤空字符串
@@ -678,8 +741,9 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     QMessageBox.warning(self, self.tr("Error"), self.tr("Z, X and Y must be integers"))
                     return
 
+                tile_scheme = CoordinatesSystemType.TMS if "TMS Tile" in coord_type else CoordinatesSystemType.XYZ
                 try:
-                    center_point = self.xyz_to_center_point(x, y, z)
+                    center_point = self.xyz_to_center_point(x, y, z, tile_scheme)
                 except Exception as e:
                     QMessageBox.warning(self, self.tr("Error"), str(e))
                     return
@@ -756,12 +820,11 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         except Exception as e:
             raise Exception(self.tr("Failed to parse NDS Tile ID: {0}").format(str(e)))
 
-    def xyz_to_center_point(self, x, y, level):
-        """根据XYZ坐标获取中心点（WGS84）"""
+    def xyz_to_center_point(self, x, y, level, tile_type=CoordinatesSystemType.XYZ):
+        """根据 XYZ 或 TMS 坐标获取中心点（WGS84）"""
         try:
-            # 获取XYZ Tile的边界
             x_min, y_min, x_max, y_max = get_x_y_bounds(
-                x, y, level, tile_type=CoordinatesSystemType.XYZ, out_type=CoordinatesSystemType.WGS84
+                x, y, level, tile_type=tile_type, out_type=CoordinatesSystemType.WGS84
             )
 
             # 计算中心点
@@ -770,6 +833,8 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
             return QgsPointXY(center_x, center_y)
         except Exception as e:
+            if tile_type == CoordinatesSystemType.TMS:
+                raise Exception(self.tr("Failed to parse TMS coordinates: {0}").format(str(e)))
             raise Exception(self.tr("Failed to parse XYZ coordinates: {0}").format(str(e)))
 
     def nds_xy_to_center_point(self, x, y, level):
@@ -793,6 +858,7 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         try:
             if self.crosshair is None:
                 self.init_crosshair()
+            if self.crosshair is None:
                 return
 
             if self.crosshair_visible:
@@ -863,51 +929,137 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         elif current_tab == 0:  # 坐标转换标签页
             self.goto_coordinate()
 
-    def create_geometry_from_geojson(self, geometry_data):
-        """从GeoJSON geometry对象创建QgsGeometry
+    def _xy_points(self, coords):
+        """把坐标序列转成点。只取经度、纬度，忽略 Z/M。"""
+        points = []
+        for coord in coords or []:
+            if isinstance(coord, (list, tuple)) and len(coord) >= 2:
+                points.append(QgsPointXY(float(coord[0]), float(coord[1])))
+        return points
 
-        Args:
-            geometry_data: GeoJSON geometry 对象字典
+    def _ring_points(self, ring):
+        """多边形环。点数不够或未闭合时补上闭合点。"""
+        points = self._xy_points(ring)
+        if len(points) >= 3 and points[0] != points[-1]:
+            points.append(QgsPointXY(points[0]))
+        if len(points) < 4:
+            return []
+        return points
 
-        Returns:
-            QgsGeometry对象，如果失败则返回None
-        """
-        geom = None
+    def _polygon_rings(self, rings):
+        """外环加全部内环。内环无效时只丢掉该环，保留多边形本身。"""
+        polygon = []
+        for ring in rings or []:
+            points = self._ring_points(ring)
+            if points:
+                polygon.append(points)
+        if not polygon:
+            return []
+        return polygon
+
+    def _explode_geometry(self, geom):
+        """GeometryCollection 拆成独立几何，其余类型原样返回。"""
+        if geom is None or geom.isNull() or geom.isEmpty():
+            return []
+        if QgsWkbTypes.flatType(geom.wkbType()) == QgsWkbTypes.GeometryCollection:
+            parts = []
+            for child in geom.asGeometryCollection():
+                parts.extend(self._explode_geometry(child))
+            return parts
+        return [geom]
+
+    def _extract_wkt_snippets(self, text):
+        """按括号配对截取 WKT，避免在内环或多部件的第一个右括号处被截断。"""
+        head = re.compile(
+            r'(GEOMETRYCOLLECTION|MULTILINESTRING|MULTIPOLYGON|MULTIPOINT|LINESTRING|POLYGON|POINT)'
+            r'(?:\s+(?:ZM|Z|M))?\s*\(',
+            re.IGNORECASE,
+        )
+        snippets = []
+        pos = 0
+        while True:
+            match = head.search(text, pos)
+            if not match:
+                break
+            start = match.start()
+            depth = 0
+            end = None
+            for index in range(match.end() - 1, len(text)):
+                char = text[index]
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                    if depth == 0:
+                        end = index + 1
+                        break
+            if end is None:
+                pos = match.end()
+                continue
+            snippets.append(text[start:end])
+            pos = end
+        return snippets
+
+    def geometries_from_geojson(self, geometry_data):
+        """从 GeoJSON geometry 创建几何列表。集合会被拆开，多边形保留内环。"""
+        if not isinstance(geometry_data, dict):
+            return []
         geom_type = geometry_data.get('type', '')
-        coords = geometry_data.get('coordinates', [])
+        if geom_type == 'GeometryCollection':
+            geoms = []
+            for child in geometry_data.get('geometries') or []:
+                geoms.extend(self.geometries_from_geojson(child))
+            return geoms
 
+        coords = geometry_data.get('coordinates', [])
+        geom = None
         try:
-            # 根据类型直接从坐标创建
             if geom_type == 'Point':
-                if len(coords) >= 2:
-                    geom = QgsGeometry.fromPointXY(QgsPointXY(coords[0], coords[1]))
+                points = self._xy_points([coords])
+                if points:
+                    geom = QgsGeometry.fromPointXY(points[0])
             elif geom_type == 'LineString':
-                if len(coords) >= 2:
-                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords]
+                points = self._xy_points(coords)
+                if len(points) >= 2:
                     geom = QgsGeometry.fromPolylineXY(points)
             elif geom_type == 'Polygon':
-                if len(coords) >= 1 and len(coords[0]) >= 3:
-                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords[0]]
-                    geom = QgsGeometry.fromPolygonXY([points])
+                rings = self._polygon_rings(coords)
+                if rings:
+                    geom = QgsGeometry.fromPolygonXY(rings)
             elif geom_type == 'MultiPoint':
-                if len(coords) >= 1:
-                    points = [QgsPointXY(coord[0], coord[1]) for coord in coords]
+                points = self._xy_points(coords)
+                if points:
                     geom = QgsGeometry.fromMultiPointXY(points)
             elif geom_type == 'MultiLineString':
-                if len(coords) >= 1:
-                    lines = [[QgsPointXY(coord[0], coord[1]) for coord in line] for line in coords]
+                lines = [self._xy_points(line) for line in coords or []]
+                lines = [line for line in lines if len(line) >= 2]
+                if lines:
                     geom = QgsGeometry.fromMultiPolylineXY(lines)
             elif geom_type == 'MultiPolygon':
-                if len(coords) >= 1:
-                    polygons = [
-                        [[QgsPointXY(coord[0], coord[1]) for coord in ring] for ring in poly] for poly in coords
-                    ]
+                polygons = [self._polygon_rings(poly) for poly in coords or []]
+                polygons = [poly for poly in polygons if poly]
+                if polygons:
                     geom = QgsGeometry.fromMultiPolygonXY(polygons)
         except Exception as e:
             QgsMessageLog.logMessage(f"Error creating geometry from coordinates: {str(e)}", "MxExport Plugin")
-            geom = None
+            return []
 
-        return geom
+        return self._explode_geometry(geom)
+
+    def _memory_layer_type(self, group_type, items):
+        """组内只要有 Multi 几何，图层就用 Multi 类型，并把单部件升成 Multi。"""
+        has_multi = any(QgsWkbTypes.isMultiType(geom.wkbType()) for geom, _props in items)
+        if group_type == 'Point':
+            layer_type = 'MultiPoint' if has_multi else 'Point'
+        elif group_type == 'LineString':
+            layer_type = 'MultiLineString' if has_multi else 'LineString'
+        else:
+            layer_type = 'MultiPolygon' if has_multi else 'Polygon'
+        if has_multi:
+            for geom, _props in items:
+                if not QgsWkbTypes.isMultiType(geom.wkbType()):
+                    geom.convertToMultiType()
+        return layer_type
 
     def process_wkt_geojson(self):
         """处理WKT/GeoJSON数据，采用先解析后显示的思路，支持跨行GeoJSON"""
@@ -976,33 +1128,34 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                         elif 'type' in data:
                             temp_features = [{"type": "Feature", "geometry": data, "properties": {}}]
                     for feat in temp_features:
+                        if not isinstance(feat, dict):
+                            continue
                         geom_data = feat.get('geometry')
-                        props = feat.get('properties', {})
+                        props = feat.get('properties') or {}
+                        if not isinstance(props, dict):
+                            props = {}
                         if geom_data:
-                            geom = self.create_geometry_from_geojson(geom_data)
-                            if geom and not geom.isNull():
+                            for geom in self.geometries_from_geojson(geom_data):
                                 parsed_items.append((geom, props))
                 else:
-                    wkt_patterns = r'(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\s*\(.*?\)'
-                    matches = list(re.finditer(wkt_patterns, content, re.IGNORECASE | re.DOTALL))
-                    if matches:
-                        for match in matches:
-                            wkt_str = match.group(0)
-                            geom = QgsGeometry.fromWkt(wkt_str)
-                            if geom and not geom.isNull():
+                    snippets = self._extract_wkt_snippets(content)
+                    if snippets:
+                        for wkt_str in snippets:
+                            parts = self._explode_geometry(QgsGeometry.fromWkt(wkt_str))
+                            formatted_wkt = re.sub(r'\s+', ' ', wkt_str).strip().upper()
+                            formatted_segments.append(formatted_wkt)
+                            for geom in parts:
                                 parsed_items.append((geom, {"source": "WKT"}))
-                                # 格式化 WKT：压缩多余空白并转为大写
-                                formatted_wkt = re.sub(r'\s+', ' ', wkt_str).strip().upper()
-                                formatted_segments.append(formatted_wkt)
                     else:
                         for line in content.split('\n'):
                             line = line.strip()
                             if not line:
                                 continue
-                            geom = QgsGeometry.fromWkt(line)
-                            if geom and not geom.isNull():
-                                parsed_items.append((geom, {"source": "WKT"}))
+                            parts = self._explode_geometry(QgsGeometry.fromWkt(line))
+                            if parts:
                                 formatted_segments.append(line.upper())
+                                for geom in parts:
+                                    parsed_items.append((geom, {"source": "WKT"}))
             except Exception as e:
                 QgsMessageLog.logMessage(f"Segment parse error: {str(e)}", "MxExport", Qgis.Warning)
                 formatted_segments.append(content)  # 出错则保留原样
@@ -1056,7 +1209,8 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     suffix = "_pg"
 
                 specific_layer_name = f"{layer_name}{suffix}"
-                layer = self.create_single_type_layer(items, g_type, specific_layer_name, dest_crs)
+                memory_type = self._memory_layer_type(g_type, items)
+                layer = self.create_single_type_layer(items, memory_type, specific_layer_name, dest_crs)
 
                 if layer:
                     created_layers.append(layer)
@@ -1211,15 +1365,16 @@ class MapExportDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         center_point = self.get_center_point('EPSG:4326')
         level = int(self.level_combo.currentText())
 
-        if self.tile_type_combo.currentText() == "NDS":
+        tile_type_text = self.tile_type_combo.currentText()
+        if tile_type_text == "NDS":
             if level > 13:
                 QMessageBox.warning(self, self.tr("Warning"), self.tr("NDS Tile level cannot exceed 13"))
                 self.level_combo.setCurrentText("13")
                 level = 13
             tile_id = encode_tile_id(center_point.x(), center_point.y(), level, is_wgs84=True)
             x, y = parse_tile_id_2_nds(tile_id)
-        else:  # XYZ
-            x, y = latlon_to_xyz(center_point.x(), center_point.y(), level)
+        else:  # XYZ / TMS
+            x, y = self.slippy_tile_xy(center_point.x(), center_point.y(), level, tile_type_text)
             tile_id = None
 
         # 构建复制文本

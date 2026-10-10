@@ -23,6 +23,8 @@ class CrosshairOverlay(QgsMapCanvasItem):
         # 显示状态
         self.show_crosshair_flag = True
         self.show_tile_boundary_flag = False
+        # small: 当前的短十字；full: 横竖线拉满屏幕
+        self.crosshair_style = "small"
 
         # 设置 Item 始终覆盖全屏
         self.setZValue(1000)  # 确保在最上层
@@ -39,10 +41,7 @@ class CrosshairOverlay(QgsMapCanvasItem):
             painter.setRenderHint(QPainter.Antialiasing)
 
             rect = self.canvas.contentsRect()
-            cx = rect.width() / 2
-            cy = rect.height() / 2
-
-            self._draw_crosshair(painter, cx, cy)
+            self._draw_crosshair(painter, rect)
 
         # 恢复变换状态以便后续绘制（如果需要跟随地图）
         painter.restore()
@@ -52,7 +51,13 @@ class CrosshairOverlay(QgsMapCanvasItem):
             painter.setRenderHint(QPainter.Antialiasing)
             self._draw_realtime_tile_boundary(painter)
 
-    def _draw_crosshair(self, painter, cx, cy):
+    def set_crosshair_style(self, style):
+        """small 为短十字，full 为横竖线拉满屏幕。"""
+        self.crosshair_style = style if style in ("small", "full") else "small"
+        if self.show_crosshair_flag:
+            self.refresh_overlay()
+
+    def _draw_crosshair(self, painter, rect):
         """绘制十字准线"""
         # 线条加宽：改为 2 像素，并保持像素对齐避免横竖粗细不一致
         painter.setRenderHint(QPainter.Antialiasing, False)
@@ -61,19 +66,27 @@ class CrosshairOverlay(QgsMapCanvasItem):
         pen.setCapStyle(Qt.FlatCap)
         painter.setPen(pen)
 
+        cx = rect.x() + rect.width() / 2
+        cy = rect.y() + rect.height() / 2
         # 加宽后仍然做像素对齐，减少虚化
         ix = int(cx) + 0.5
         iy = int(cy) + 0.5
 
         cross_length, cross_gap = 30, 8
 
-        # 水平线
-        painter.drawLine(QPointF(ix - cross_length, iy), QPointF(ix - cross_gap, iy))
-        painter.drawLine(QPointF(ix + cross_gap, iy), QPointF(ix + cross_length, iy))
+        if self.crosshair_style == "full":
+            painter.drawLine(QPointF(rect.left(), iy), QPointF(ix - cross_gap, iy))
+            painter.drawLine(QPointF(ix + cross_gap, iy), QPointF(rect.right(), iy))
+            painter.drawLine(QPointF(ix, rect.top()), QPointF(ix, iy - cross_gap))
+            painter.drawLine(QPointF(ix, iy + cross_gap), QPointF(ix, rect.bottom()))
+        else:
+            # 水平线
+            painter.drawLine(QPointF(ix - cross_length, iy), QPointF(ix - cross_gap, iy))
+            painter.drawLine(QPointF(ix + cross_gap, iy), QPointF(ix + cross_length, iy))
 
-        # 垂直线
-        painter.drawLine(QPointF(ix, iy - cross_length), QPointF(ix, iy - cross_gap))
-        painter.drawLine(QPointF(ix, iy + cross_gap), QPointF(ix, iy + cross_length))
+            # 垂直线
+            painter.drawLine(QPointF(ix, iy - cross_length), QPointF(ix, iy - cross_gap))
+            painter.drawLine(QPointF(ix, iy + cross_gap), QPointF(ix, iy + cross_length))
 
         # 中心点（开启抗锯齿使圆点平滑）
         painter.setRenderHint(QPainter.Antialiasing, True)
@@ -98,9 +111,13 @@ class CrosshairOverlay(QgsMapCanvasItem):
 
             # 计算瓦片多边形 (WGS84)
             nds_str = QCoreApplication.translate("CrosshairOverlay", "NDS")
+            tms_str = QCoreApplication.translate("CrosshairOverlay", "TMS")
             if tile_type == nds_str or tile_type == "NDS":
                 tile_id = encode_tile_id(center_wgs84.x(), center_wgs84.y(), level, is_wgs84=True)
                 polygon_coords = get_tile_bounds_polygon(tile_id, tile_type=CoordinatesSystemType.NDS)
+            elif tile_type == tms_str or tile_type == "TMS":
+                tx, ty = latlon_to_tms(center_wgs84.x(), center_wgs84.y(), level)
+                polygon_coords = get_x_y_bounds_polygon(tx, ty, level, tile_type=CoordinatesSystemType.TMS)
             else:
                 tx, ty = latlon_to_xyz(center_wgs84.x(), center_wgs84.y(), level)
                 polygon_coords = get_x_y_bounds_polygon(tx, ty, level, tile_type=CoordinatesSystemType.XYZ)
@@ -146,13 +163,29 @@ class CrosshairOverlay(QgsMapCanvasItem):
         # 返回一个足够大的 QRectF 确保始终重绘
         return QRectF(-1e15, -1e15, 2e15, 2e15)
 
+    def refresh_overlay(self):
+        """立刻重绘覆盖层。
+
+        boundingRect 覆盖整个地图范围，item.update() 换算到屏幕后会得到无效脏区，
+        十字准线开关后画面不会变。这里改为刷新整个视口。
+        """
+        canvas = self.canvas
+        if canvas is None:
+            return
+        scene = canvas.scene()
+        if scene is not None:
+            scene.update()
+        viewport = canvas.viewport()
+        if viewport is not None:
+            viewport.update()
+
     def show_crosshair_display(self):
         self.show_crosshair_flag = True
-        self.update()
+        self.refresh_overlay()
 
     def hide_crosshair(self):
         self.show_crosshair_flag = False
-        self.update()
+        self.refresh_overlay()
 
     @property
     def show_tile_boundary(self):
@@ -161,15 +194,15 @@ class CrosshairOverlay(QgsMapCanvasItem):
     @show_tile_boundary.setter
     def show_tile_boundary(self, value):
         self.show_tile_boundary_flag = value
-        self.update()
+        self.refresh_overlay()
 
     def hide_tile_boundary(self):
         self.show_tile_boundary_flag = False
-        self.update()
+        self.refresh_overlay()
 
     def set_tile_boundary(self, polygon):
         """兼容旧接口，现在由 paint 实时计算，此方法仅占位"""
-        self.update()
+        self.refresh_overlay()
 
     def resizeEvent(self, event):
         """QWidget 时代的残留，QgsMapCanvasItem 不需要，但保留以防万一"""

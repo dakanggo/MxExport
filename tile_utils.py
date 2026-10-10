@@ -16,6 +16,7 @@ class CoordinatesSystemType(enum.Enum):
     NDS = (1,)
     XYZ = (2,)
     MERCATOR = 3
+    TMS = (4,)
 
 
 def wgs84_to_nds(x, level, y_flag=False) -> int:
@@ -317,12 +318,14 @@ def get_x_y_bounds(
         d = nds_degree(tile_level)
         x_max = x_min + d
         y_max = y_min + d
-    elif tile_type == CoordinatesSystemType.XYZ and out_type == CoordinatesSystemType.WGS84:
-        x_min, y_max = xyz_tile_to_lonlat(nds_x, nds_y, tile_level)
-        x_max, y_min = xyz_tile_to_lonlat(nds_x + 1, nds_y + 1, tile_level)
-    elif tile_type == CoordinatesSystemType.XYZ and out_type == CoordinatesSystemType.MERCATOR:
-        x_min, y_max = tile_to_mercator(nds_x, nds_y, tile_level)
-        x_max, y_min = tile_to_mercator(nds_x + 1, nds_y + 1, tile_level)
+    elif tile_type in (CoordinatesSystemType.XYZ, CoordinatesSystemType.TMS) and out_type == CoordinatesSystemType.WGS84:
+        tx, ty = _slippy_xy(nds_x, nds_y, tile_level, tile_type)
+        x_min, y_max = xyz_tile_to_lonlat(tx, ty, tile_level)
+        x_max, y_min = xyz_tile_to_lonlat(tx + 1, ty + 1, tile_level)
+    elif tile_type in (CoordinatesSystemType.XYZ, CoordinatesSystemType.TMS) and out_type == CoordinatesSystemType.MERCATOR:
+        tx, ty = _slippy_xy(nds_x, nds_y, tile_level, tile_type)
+        x_min, y_max = tile_to_mercator(tx, ty, tile_level)
+        x_max, y_min = tile_to_mercator(tx + 1, ty + 1, tile_level)
 
     if expand_bounds[0] != 0 or expand_bounds[1] != 0:
         x_step = (x_max - x_min) / extent
@@ -611,6 +614,28 @@ def latlon_to_xyz(lon, lat, zoom):
     return tile_x, tile_y
 
 
+def tms_y_to_xyz(y, zoom):
+    """TMS 行号转 XYZ 行号。X、Z 相同，Y 轴方向相反。"""
+    return (1 << int(zoom)) - 1 - int(y)
+
+
+def xyz_y_to_tms(y, zoom):
+    """XYZ 行号转 TMS 行号。"""
+    return tms_y_to_xyz(y, zoom)
+
+
+def _slippy_xy(x, y, zoom, tile_type):
+    """边界计算统一走 XYZ 行号。TMS 先把 Y 翻转。"""
+    if tile_type == CoordinatesSystemType.TMS:
+        return x, tms_y_to_xyz(y, zoom)
+    return x, y
+
+
+def latlon_to_tms(lon, lat, zoom):
+    tile_x, tile_y = latlon_to_xyz(lon, lat, zoom)
+    return tile_x, xyz_y_to_tms(tile_y, zoom)
+
+
 def tile_to_mercator(x, y, z):
     # 计算 Web Mercator 坐标
     mx = (x / (2**z)) * 2 * originShift - originShift
@@ -626,12 +651,11 @@ def mercator_to_latlon(mx, my):
 
 
 def xyz_tile_to_lonlat(x, y, z):
-    # 将瓦片坐标转换为 Web Mercator 坐标
-    mx, my = tile_to_mercator(x, y, z)
-
-    # 将 Web Mercator 坐标转换为 WGS84 经纬度
-    lat, lon = mercator_to_latlon(mx, my)
-
+    # 纬度走墨卡托反算；经度与瓦片列线性对应，直接算可避免 originShift(含π) 往返浮点尾差
+    # 例如 113.37890625000001 → 精确值应为 113.37890625
+    _, my = tile_to_mercator(x, y, z)
+    lat, _ = mercator_to_latlon(0, my)
+    lon = x / (2**z) * 360.0 - 180.0
     return lon, lat
 
 

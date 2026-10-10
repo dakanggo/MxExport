@@ -13,6 +13,12 @@
   <property name="windowTitle">
    <string>MxExport</string>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>360</width>
+    <height>520</height>
+   </size>
+  </property>
   <widget class="QWidget" name="dockWidgetContents">
    <property name="styleSheet">
     <string notr="true">
@@ -213,6 +219,11 @@
                  <string notr="true">XYZ Tile</string>
                 </property>
                </item>
+               <item>
+                <property name="text">
+                 <string notr="true">TMS Tile</string>
+                </property>
+               </item>
               </widget>
              </item>
             </layout>
@@ -236,11 +247,20 @@
             </layout>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="coord_buttons_layout">
+            <layout class="QVBoxLayout" name="coord_actions_layout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
              <item>
               <widget class="QPushButton" name="goto_coord_btn">
                <property name="text">
                 <string>Go to Coordinate</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>32</height>
+                </size>
                </property>
                <property name="styleSheet">
                 <string notr="true">
@@ -260,18 +280,59 @@
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="set_point_btn">
-               <property name="text">
-                <string>Set Marker Point</string>
+              <layout class="QHBoxLayout" name="coord_buttons_layout">
+               <property name="spacing">
+                <number>8</number>
                </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="show_crosshair_btn">
-               <property name="text">
-                <string>Hide Crosshair</string>
-               </property>
-              </widget>
+               <item>
+                <widget class="QPushButton" name="set_point_btn">
+                 <property name="text">
+                  <string>Set Marker Point</string>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>32</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="show_crosshair_btn">
+                 <property name="text">
+                  <string>Hide Crosshair</string>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>32</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QComboBox" name="crosshair_style_combo">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>88</width>
+                   <height>32</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>88</width>
+                   <height>32</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
              </item>
             </layout>
            </item>
@@ -318,6 +379,11 @@
                <item>
                 <property name="text">
                  <string notr="true">XYZ</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string notr="true">TMS</string>
                 </property>
                </item>
               </widget>
@@ -589,7 +655,7 @@
        <attribute name="title">
         <string notr="true">WKT/GeoJSON</string>
        </attribute>
-       <layout class="QVBoxLayout" name="wkt_layout">
+       <layout class="QVBoxLayout" name="wkt_layout" stretch="1,0,0">
         <property name="spacing">
          <number>15</number>
         </property>
@@ -609,6 +675,12 @@
          <widget class="QGroupBox" name="data_group">
           <property name="title">
            <string>Data Input</string>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>1</verstretch>
+           </sizepolicy>
           </property>
           <layout class="QVBoxLayout" name="data_layout">
            <property name="spacing">
@@ -645,6 +717,18 @@
             <widget class="QTextEdit" name="wkt_text_edit">
              <property name="placeholderText">
               <string>Enter WKT or GeoJSON data here...</string>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>120</height>
+              </size>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Ignored">
+               <horstretch>0</horstretch>
+               <verstretch>1</verstretch>
+              </sizepolicy>
              </property>
             </widget>
            </item>
@@ -816,7 +900,7 @@
     &lt;li&gt;&lt;b&gt;Multi-Format Import:&lt;/b&gt; Smart parsing of mixed WKT and GeoJSON (including multi-line formats).&lt;/li&gt;
     &lt;li&gt;&lt;b&gt;Auto-Layering:&lt;/b&gt; Automatically creates separate memory layers for Points, Lines, and Polygons.&lt;/li&gt;
     &lt;li&gt;&lt;b&gt;Coordinate Hub:&lt;/b&gt; Seamless conversion between WGS84 and Web Mercator with one-click jump.&lt;/li&gt;
-    &lt;li&gt;&lt;b&gt;Tile Utilities:&lt;/b&gt; Visualize NDS TileID and XYZ Tile boundaries for map development.&lt;/li&gt;
+    &lt;li&gt;&lt;b&gt;Tile Utilities:&lt;/b&gt; Visualize NDS TileID, XYZ and TMS tile boundaries for map development.&lt;/li&gt;
     &lt;li&gt;&lt;b&gt;Data Beautifier:&lt;/b&gt; Automatic JSON formatting and WKT standardization after processing.&lt;/li&gt;
 &lt;/ul&gt;</string>
               </property>
@@ -845,7 +929,7 @@
     &lt;table width=&quot;100%&quot; cellpadding=&quot;2&quot;&gt;
         &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Developer:&lt;/td&gt;&lt;td style=&quot;color: #2c3e50; font-weight: bold; font-size: 12px;&quot;&gt;DAKANG&lt;/td&gt;&lt;/tr&gt;
         &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Email:&lt;/td&gt;&lt;td&gt;&lt;a href=&quot;mailto:yujikang@mxnavi.com&quot; style=&quot;color: #3498db; text-decoration: none; font-size: 12px;&quot;&gt;yujikang@mxnavi.com&lt;/a&gt;&lt;/td&gt;&lt;/tr&gt;
-        &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Version:&lt;/td&gt;&lt;td style=&quot;color: #95a5a6; font-size: 12px;&quot;&gt;2.4.0 (Feb 2026)&lt;/td&gt;&lt;/tr&gt;
+        &lt;tr&gt;&lt;td style=&quot;color: #7f8c8d; font-size: 12px;&quot;&gt;Version:&lt;/td&gt;&lt;td style=&quot;color: #95a5a6; font-size: 12px;&quot;&gt;2.5.0 (Oct 2026)&lt;/td&gt;&lt;/tr&gt;
     &lt;/table&gt;
 &lt;/div&gt;</string>
               </property>
